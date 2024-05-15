@@ -8,8 +8,23 @@ Put `pan_batido` directory in you qgis plugin folder
 
 ## Current status
 ### Features:
-* Reads all layers available and draws a dialog with name, checkbox, weight (as spinbox & slider in 0,100 range) 
+* Reads all layers available and draws a dialog with each row belonging to a layer, containing
+- layer name 
+- weight attributes (checkbox for dis/en-abling, spinbox & slider in 0,100 range) 
+- utility function configuration x2:
+-- Min-Max scaling, with a invert checkbox
+-- Bi-Piecewise-Linear, with spinboxes&sliders for its two 2 points (where the range are the raster min-max values)
 
 ### Development notes:
 * dialog_base.ui is dummy
+* pan_frances.py is not used right now
+* a installation of fire2-lib is required
+```
+pip install git+https://github.com/fire2a/fire2a-lib.git
+or 
+git clone git@github.com:fire2a/fire2a-lib.git
+cd fire2a-lib
+pip install -e .
+```
+
 
