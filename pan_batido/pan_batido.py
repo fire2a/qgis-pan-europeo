@@ -22,7 +22,11 @@
  ***************************************************************************/
 """
 import os.path
+import tempfile
 
+import numpy as np
+from fire2a.raster import read_raster
+from osgeo import gdal
 from qgis.core import QgsMessageLog
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
@@ -189,6 +193,10 @@ class Marraqueta:
         # See if OK was pressed
         if result:
             QgsMessageLog.logMessage("OK clicked", "Marraqueta")
+
+            self.dlg.rescale_weights()
+
+            data = []
             # get all values of each row
             for i, row in enumerate(self.dlg.rows):
                 layer, checkbox, spinbox, slider = row
@@ -196,3 +204,46 @@ class Marraqueta:
                     f"{i=}, {layer.name()=}, {checkbox.isChecked()=}, {spinbox.value()=}, slider {slider.value()=}",
                     "Marraqueta",
                 )
+                adict = {"name": layer.name()}
+                adict["data"], adict["info"] = read_raster(layer.publicSource())
+                if checkbox:
+                    weight = spinbox.value()
+                else:
+                    weight = 0
+                adict["weight"] = weight
+                data += [adict]
+
+            # for every data, normalize then dot product by weight and sum
+            H, W = data[0]["data"].shape
+            GT = data[0]["info"]["Transform"]
+            final_data = np.zeros((H, W), dtype=np.float32)
+
+            for adict in data:
+                # min_max_scale
+                dat = adict["data"]
+                nodata = adict["info"]["NoDataValue"]
+                min_val = dat[dat != nodata].min()
+                max_val = dat[dat != nodata].max()
+                if max_val != min_val:
+                    min_max_scaled = (adict["data"] - min_val) / (max_val - min_val)
+                else:
+                    min_max_scaled = np.zeros_like(dat)
+                min_max_scaled = np.float32(min_max_scaled)
+                QgsMessageLog.logMessage(f"{np.histogram(min_max_scaled)=}", "Marraqueta")
+                final_data[dat != nodata] += adict["weight"] / 100 * min_max_scaled[dat != nodata]
+
+            # create a new layer with final data
+            afile = tempfile.mktemp(suffix=".tif")
+            ds = gdal.GetDriverByName("GTiff").Create(afile, W, H, 1, gdal.GDT_Float32)
+            ds.SetGeoTransform(GT)  # specify coords
+            ds.SetProjection(layer.crs().authid())  # export coords to file
+            band = ds.GetRasterBand(1)
+            if 0 != band.SetNoDataValue(-9999):
+                feedback.pushWarning("Set No Data failed for mean band")
+            if 0 != band.WriteArray(final_data):
+                QgsMessageLog.logMessage("WriteArray failed for mean band", "Marraqueta")
+            ds.FlushCache()  # write to disk
+            ds = None
+
+            # add the raster layer to the canvas
+            self.iface.addRasterLayer(afile, "final_data")

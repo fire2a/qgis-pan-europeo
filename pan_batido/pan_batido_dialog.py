@@ -77,6 +77,18 @@ class MarraquetaDialog(QtWidgets.QDialog):
         self.destroy()
         self = self.__init__()
 
+    def rescale_weights(self):
+        """all inputs should sum to 100"""
+        weight = 0
+        for row in self.rows:
+            _, checkbox, spinbox, _ = row
+            if checkbox.isChecked():
+                weight += spinbox.value()
+        if weight != 100:
+            for row in self.rows:
+                _, checkbox, spinbox, _ = row
+                spinbox.setValue(int(spinbox.value() * 100 / weight))
+
 
 def link_spinbox_slider_checkbox(spinbox, slider, checkbox):
     """Link a QSpinBox, QSlider and QCheckBox together."""
