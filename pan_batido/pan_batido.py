@@ -27,7 +27,7 @@ import tempfile
 import numpy as np
 from fire2a.raster import read_raster
 from osgeo import gdal
-from qgis.core import QgsMessageLog
+from qgis.core import Qgis, QgsMessageLog
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
@@ -177,73 +177,115 @@ class Marraqueta:
 
     def run(self):
         """Run method that performs all the real work"""
-        QgsMessageLog.logMessage(f"current layers {self.iface.mapCanvas().layers()}", "Marraqueta")
+        QgsMessageLog.logMessage(f"current layers {self.iface.mapCanvas().layers()}", "Marraqueta", Qgis.Info)
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
+            if len(self.iface.mapCanvas().layers()) == 0:
+                QgsMessageLog.logMessage("No layers loaded. Not loading the dialog!", "Marraqueta", Qgis.Critical)
+                # display a message in system toolbar
+                self.iface.messageBar().pushMessage(
+                    "No layers loaded",
+                    "Please load some raster layers before launching the PAN-BATIDO plugin",
+                    level=Qgis.Critical,
+                    duration=5,
+                )
+                return
             self.first_start = False
             self.dlg = MarraquetaDialog()
+            self.lyr_data = []
+            for dlg_row in self.dlg.rows:
+                layer = dlg_row["layer"]
+                dat, info = read_raster(layer.publicSource())
+                self.lyr_data += [{"layer": layer, "data": dat, "info": info}]
+                rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
+                QgsMessageLog.logMessage(f"{rimin=} {rimax=}", "Marraqueta", Qgis.Info)
+                for name in ["a_spinbox", "b_spinbox", "a_slider", "b_slider"]:
+                    ret_val = dlg_row[name].setRange(rimin, rimax)
+                    QgsMessageLog.logMessage(f"{name=} {ret_val=}", "Marraqueta", Qgis.Info)
+            QgsMessageLog.logMessage(f"{self.lyr_data=}", "Marraqueta", Qgis.Info)
+            self.H, self.W = self.lyr_data[0]["data"].shape
+            self.GT = self.lyr_data[0]["info"]["Transform"]
+            self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
+            QgsMessageLog.logMessage(
+                f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}", "Marraqueta", Qgis.Info
+            )
+            QgsMessageLog.logMessage("not checking if rasters match!", "Marraqueta", Qgis.Warning)
 
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        QgsMessageLog.logMessage(f"{result=} {self.dlg.DialogCode()=}", "Marraqueta")
+        QgsMessageLog.logMessage(f"{result=} {self.dlg.DialogCode()=}", "Marraqueta", Qgis.Info)
         # See if OK was pressed
         if result:
-            QgsMessageLog.logMessage("OK clicked", "Marraqueta")
+            QgsMessageLog.logMessage("OK clicked", "Marraqueta", Qgis.Info)
 
             self.dlg.rescale_weights()
 
-            data = []
-            # get all values of each row
-            for i, row in enumerate(self.dlg.rows):
-                layer, checkbox, spinbox, slider = row
-                QgsMessageLog.logMessage(
-                    f"{i=}, {layer.name()=}, {checkbox.isChecked()=}, {spinbox.value()=}, slider {slider.value()=}",
-                    "Marraqueta",
-                )
-                adict = {"name": layer.name()}
-                adict["data"], adict["info"] = read_raster(layer.publicSource())
-                if checkbox:
-                    weight = spinbox.value()
-                else:
-                    weight = 0
-                adict["weight"] = weight
-                data += [adict]
+            final_data = np.zeros((self.H, self.W), dtype=np.float32)
+            did_any = False
+            for dlg_row in self.dlg.rows:
+                if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
+                    weight = dlg_row["weight_spinbox"].value()
+                    lyr = self.lyr_data[dlg_row["i"]]
+                    lyr_data = lyr["data"]
+                    lyr_nodata = lyr["info"]["NoDataValue"]
+                    match dlg_row["func_dropdown"].currentIndex():
+                        case 0:
+                            new_data = min_max_scaling(
+                                lyr_data, lyr_nodata, invert=dlg_row["minmax_invert"].isChecked()
+                            )
+                            did_any = True
+                        case 1:
+                            a = dlg_row["a_spinbox"].value()
+                            b = dlg_row["b_spinbox"].value()
+                            if a != b:
+                                new_data = bi_piecewise_linear(
+                                    lyr_data, lyr_nodata, dlg_row["a_spinbox"].value(), dlg_row["b_spinbox"].value()
+                                )
+                                did_any = True
+                    QgsMessageLog.logMessage(
+                        f"{lyr['layer'].name()=} {np.histogram(new_data)=}", "Marraqueta", Qgis.Info
+                    )
+                    final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
 
-            # for every data, normalize then dot product by weight and sum
-            H, W = data[0]["data"].shape
-            GT = data[0]["info"]["Transform"]
-            final_data = np.zeros((H, W), dtype=np.float32)
-
-            for adict in data:
-                # min_max_scale
-                dat = adict["data"]
-                nodata = adict["info"]["NoDataValue"]
-                min_val = dat[dat != nodata].min()
-                max_val = dat[dat != nodata].max()
-                if max_val != min_val:
-                    min_max_scaled = (adict["data"] - min_val) / (max_val - min_val)
-                else:
-                    min_max_scaled = np.zeros_like(dat)
-                min_max_scaled = np.float32(min_max_scaled)
-                QgsMessageLog.logMessage(f"{np.histogram(min_max_scaled)=}", "Marraqueta")
-                final_data[dat != nodata] += adict["weight"] / 100 * min_max_scaled[dat != nodata]
+            if not did_any:
+                QgsMessageLog.logMessage("Nothing to do, all layers unselected or 0 weight", "Marraqueta", Qgis.Info)
+                return
 
             # create a new layer with final data
             afile = tempfile.mktemp(suffix=".tif")
-            ds = gdal.GetDriverByName("GTiff").Create(afile, W, H, 1, gdal.GDT_Float32)
-            ds.SetGeoTransform(GT)  # specify coords
-            ds.SetProjection(layer.crs().authid())  # export coords to file
+            ds = gdal.GetDriverByName("GTiff").Create(afile, self.W, self.H, 1, gdal.GDT_Float32)
+            ds.SetGeoTransform(self.GT)  # specify coords
+            ds.SetProjection(self.crs_auth_id)  # export coords to file
             band = ds.GetRasterBand(1)
             if 0 != band.SetNoDataValue(-9999):
-                feedback.pushWarning("Set No Data failed for mean band")
+                QgsMessageLog.logMessage("Set No Data failed", "Marraqueta", Qgis.Critical)
             if 0 != band.WriteArray(final_data):
-                QgsMessageLog.logMessage("WriteArray failed for mean band", "Marraqueta")
+                QgsMessageLog.logMessage("WriteArray failed", "Marraqueta", Qgis.Critical)
             ds.FlushCache()  # write to disk
             ds = None
 
             # add the raster layer to the canvas
             self.iface.addRasterLayer(afile, "final_data")
+
+
+def min_max_scaling(data, nodata, invert=False):
+    min_val = data[data != nodata].min()
+    max_val = data[data != nodata].max()
+    if max_val != min_val:
+        ret_val = (data - min_val) / (max_val - min_val)
+        if invert:
+            return np.float32(1 - ret_val)
+        return np.float32(ret_val)
+    else:
+        return np.zeros_like(data, dtype=np.float32)
+
+
+def bi_piecewise_linear(data, nodata, a, b):
+    ret_val = np.empty_like(data, dtype=np.float32)
+    ret_val[data != nodata] = (data[data != nodata] - a) / (b - a)
+    ret_val[data == nodata] = data[data == nodata]
+    return np.float32(ret_val)

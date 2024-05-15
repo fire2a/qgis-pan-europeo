@@ -1,3 +1,4 @@
+#!python3
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
@@ -33,18 +34,14 @@ class MarraquetaDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         """Constructor."""
         super(MarraquetaDialog, self).__init__(parent)
-        # Set up the user interface from Designer through FORM_CLASS.
-        # After self.setupUi() you can access any designer object by doing
-        # self.<objectname>, and you can use autoconnect slots - see
-        # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
-        # #widgets-and-dialogs-with-auto-connect
-        # verticalLayour
         QgsMessageLog.logMessage("MarraquetaDialog.__init__", "Marraqueta")
+        # set window title to Pan Europeo
+        self.setWindowTitle("Pan Europeo (layer, weights, utility function)")
         self.verticalLayout = QtWidgets.QVBoxLayout()
         self.setLayout(self.verticalLayout)
+        # for each layer a row of controls
         self.rows = []
-
-        for layer in iface.mapCanvas().layers():
+        for i, layer in enumerate(iface.mapCanvas().layers()):
             horizontalLayout = QtWidgets.QHBoxLayout()
             horizontalLayout.addWidget(QtWidgets.QLabel(layer.name()))
             checkbox = QtWidgets.QCheckBox()
@@ -54,8 +51,53 @@ class MarraquetaDialog(QtWidgets.QDialog):
             horizontalLayout.addWidget(checkbox)
             horizontalLayout.addWidget(spinbox)
             horizontalLayout.addWidget(slider)
+            # add dropdown menu with options: "min-max", "bi-piecewise-linear", "power", "exponential", "logarithmic
+            dropdown = QtWidgets.QComboBox()
+            # the order of items is func id
+            dropdown.addItems(["min-max", "bi-piecewise-linear"])
+            # signal for dropdown menu
+            dropdown.currentIndexChanged.connect(self.function_change)
+            # add id to the dropdown
+            dropdown.row_id = i
+            horizontalLayout.addWidget(dropdown)
+            # minmax parameters
+            cb = QtWidgets.QCheckBox()
+            cb.row_id = i
+            cb.setText("Invert")
+            cb.setChecked(False)
+            cb.func_id = 0
+            horizontalLayout.addWidget(cb)
+            # piecewise-linear parameters
+            # a
+            a_spinbox = QtWidgets.QSpinBox()
+            a_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(a_slider, a_spinbox)
+            # b
+            b_spinbox = QtWidgets.QSpinBox()
+            b_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(b_slider, b_spinbox)
+            for elto in [a_spinbox, a_slider, b_spinbox, b_slider]:
+                elto.row_id = i
+                elto.func_id = 1
+                elto.setVisible(False)
+                horizontalLayout.addWidget(elto)
+
             self.verticalLayout.addLayout(horizontalLayout)
-            self.rows.append([layer, checkbox, spinbox, slider])
+            self.rows += [
+                {
+                    "i": len(self.rows),
+                    "layer": layer,
+                    "weight_checkbox": checkbox,
+                    "weight_spinbox": spinbox,
+                    "weight_slider": slider,
+                    "func_dropdown": dropdown,
+                    "minmax_invert": cb,
+                    "a_spinbox": a_spinbox,
+                    "a_slider": a_slider,
+                    "b_spinbox": b_spinbox,
+                    "b_slider": b_slider,
+                }
+            ]
 
         # add a QtButtonBox to the bottom of the dialog with Ok, and Cancel
         self.buttonBox = QtWidgets.QDialogButtonBox(
@@ -79,31 +121,53 @@ class MarraquetaDialog(QtWidgets.QDialog):
 
     def rescale_weights(self):
         """all inputs should sum to 100"""
-        weight = 0
+        accum_weight = 0
         for row in self.rows:
-            _, checkbox, spinbox, _ = row
+            checkbox, spinbox = row["weight_checkbox"], row["weight_spinbox"]
             if checkbox.isChecked():
-                weight += spinbox.value()
-        if weight != 100:
+                accum_weight += spinbox.value()
+        if accum_weight != 100 and accum_weight != 0:
             for row in self.rows:
-                _, checkbox, spinbox, _ = row
-                spinbox.setValue(int(spinbox.value() * 100 / weight))
+                spinbox = row["weight_spinbox"]
+                spinbox.setValue(int(spinbox.value() * 100 / accum_weight))
+
+    def function_change(self, idx):
+        """make visible row a_spinbox, a_slider, b_spinbox, b_slider if index !=0"""
+        # def function_change(self, *args, **kwargs):
+        # QgsMessageLog.logMessage(f"{args=}, {kwargs=}", "Marraqueta")
+        # args=(1,), kwargs={}
+        QgsMessageLog.logMessage(f"dropdown {idx=} {self.sender().row_id=}", "Marraqueta")
+        # identify row
+        row = self.rows[self.sender().row_id]
+        # iterate over func_id elements
+        for elto in row.values():
+            if hasattr(elto, "func_id"):
+                if elto.func_id == idx:
+                    elto.setVisible(True)
+                else:
+                    elto.setVisible(False)
 
 
-def link_spinbox_slider_checkbox(spinbox, slider, checkbox):
-    """Link a QSpinBox, QSlider and QCheckBox together."""
-    # set minimum and maximum values to 0 and 100
+def link_spinbox_slider(slider, spinbox):
+    """Link a QSpinBox, QSlider"""
     spinbox.setRange(0, 100)
     slider.setRange(0, 100)
-
-    def set_slider_value():
-        slider.setValue(spinbox.value())
 
     def set_spinbox_value(value):
         spinbox.setValue(value)
 
+    def set_slider_value(value):
+        slider.setValue(value)
+
     spinbox.valueChanged.connect(set_slider_value)
     slider.valueChanged.connect(set_spinbox_value)
+
+
+def link_spinbox_slider_checkbox(spinbox, slider, checkbox):
+    """Link a QSpinBox, QSlider and QCheckBox together."""
+    spinbox.setRange(0, 100)
+    slider.setRange(0, 100)
+    link_spinbox_slider(slider, spinbox)
 
     def set_enabled(value):
         spinbox.setEnabled(value)
