@@ -286,6 +286,11 @@ def min_max_scaling(data, nodata, invert=False):
 
 def bi_piecewise_linear(data, nodata, a, b):
     ret_val = np.empty_like(data, dtype=np.float32)
+    # linear scaling
     ret_val[data != nodata] = (data[data != nodata] - a) / (b - a)
+    # clip to [0, 1]
+    ret_val[ret_val < 0] = 0
+    ret_val[ret_val > 1] = 1
+    # keep nodata values
     ret_val[data == nodata] = data[data == nodata]
     return np.float32(ret_val)
