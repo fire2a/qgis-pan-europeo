@@ -26,7 +26,7 @@ import tempfile
 
 import numpy as np
 from fire2a.raster import read_raster
-from osgeo import gdal
+from osgeo import gdal, osr
 from qgis.core import Qgis, QgsMessageLog
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
@@ -197,15 +197,16 @@ class Marraqueta:
             self.lyr_data = []
             for dlg_row in self.dlg.rows:
                 layer = dlg_row["layer"]
-                dat, info = read_raster(layer.publicSource())
-                self.lyr_data += [{"layer": layer, "data": dat, "info": info}]
+                _, info = read_raster(layer.publicSource(), data=False, info=True)
+                self.lyr_data += [{"layer": layer, "info": info}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
                 QgsMessageLog.logMessage(f"{rimin=} {rimax=}", "Marraqueta", Qgis.Info)
                 for name in ["a_spinbox", "b_spinbox", "a_slider", "b_slider"]:
                     ret_val = dlg_row[name].setRange(rimin, rimax)
                     QgsMessageLog.logMessage(f"{name=} {ret_val=}", "Marraqueta", Qgis.Info)
             QgsMessageLog.logMessage(f"{self.lyr_data=}", "Marraqueta", Qgis.Info)
-            self.H, self.W = self.lyr_data[0]["data"].shape
+            self.H = self.lyr_data[0]["info"]["RasterYSize"]
+            self.W = self.lyr_data[0]["info"]["RasterXSize"]
             self.GT = self.lyr_data[0]["info"]["Transform"]
             self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
             QgsMessageLog.logMessage(
@@ -224,21 +225,26 @@ class Marraqueta:
 
             self.dlg.rescale_weights()
 
-            final_data = np.zeros((self.H, self.W), dtype=np.float32)
+            extent = self.iface.mapCanvas().extent()
+            resolution = (1920, 1080)
+
+            final_data = np.zeros(resolution[::-1], dtype=np.float32)
             did_any = False
             for dlg_row in self.dlg.rows:
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
                     weight = dlg_row["weight_spinbox"].value()
                     lyr = self.lyr_data[dlg_row["i"]]
-                    lyr_data = lyr["data"]
                     lyr_nodata = lyr["info"]["NoDataValue"]
+                    lyr_data, extent, srs = get_sampled_raster_data(
+                        lyr["layer"].publicSource(), extent, resolution=(1920, 1080)
+                    )
                     match dlg_row["func_dropdown"].currentIndex():
-                        case 0:
+                        case 0:  # min_max_scaling
                             new_data = min_max_scaling(
                                 lyr_data, lyr_nodata, invert=dlg_row["minmax_invert"].isChecked()
                             )
                             did_any = True
-                        case 1:
+                        case 1:  # bi_piecewise_linear
                             a = dlg_row["a_spinbox"].value()
                             b = dlg_row["b_spinbox"].value()
                             if a != b:
@@ -246,6 +252,12 @@ class Marraqueta:
                                     lyr_data, lyr_nodata, dlg_row["a_spinbox"].value(), dlg_row["b_spinbox"].value()
                                 )
                                 did_any = True
+                        case 2:  # get_raster_data
+                            tmp_data, extent, srs = get_sampled_raster_data(
+                                lyr["layer"].publicSource(), self.iface.mapCanvas().extent(), resolution=(1920, 1080)
+                            )
+                            QgsMessageLog.logMessage(f"{tmp_data.shape=}, {tmp_data.dtype=}", "Marraqueta", Qgis.Info)
+
                     QgsMessageLog.logMessage(
                         f"{lyr['layer'].name()=} {np.histogram(new_data)=}", "Marraqueta", Qgis.Info
                     )
@@ -255,19 +267,7 @@ class Marraqueta:
                 QgsMessageLog.logMessage("Nothing to do, all layers unselected or 0 weight", "Marraqueta", Qgis.Info)
                 return
 
-            # create a new layer with final data
-            afile = tempfile.mktemp(suffix=".tif")
-            ds = gdal.GetDriverByName("GTiff").Create(afile, self.W, self.H, 1, gdal.GDT_Float32)
-            ds.SetGeoTransform(self.GT)  # specify coords
-            ds.SetProjection(self.crs_auth_id)  # export coords to file
-            band = ds.GetRasterBand(1)
-            if 0 != band.SetNoDataValue(-9999):
-                QgsMessageLog.logMessage("Set No Data failed", "Marraqueta", Qgis.Critical)
-            if 0 != band.WriteArray(final_data):
-                QgsMessageLog.logMessage("WriteArray failed", "Marraqueta", Qgis.Critical)
-            ds.FlushCache()  # write to disk
-            ds = None
-
+            afile = create_sampled_raster(*args, **kwargs)
             # add the raster layer to the canvas
             self.iface.addRasterLayer(afile, "final_data")
 
@@ -294,3 +294,126 @@ def bi_piecewise_linear(data, nodata, a, b):
     # keep nodata values
     ret_val[data == nodata] = data[data == nodata]
     return np.float32(ret_val)
+
+
+def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080)):
+    """Returns the data of the raster in the form of a numpy array, taken from the extent of the map canvas and resampled to resolution
+    Args:
+        raster_path (str): path to the raster file
+        extent (QgsRectangle): extent of the map canvas
+        resolution (tuple): resolution of the output array
+    Return:
+        data (np.array): numpy array with the data of the raster
+        extent (QgsRectangle): extent of the map canvas
+        srs (osr.SpatialReference): spatial reference of the raster
+    Raises:
+        ValueError: if the raster file could not be opened by gdal.Open
+
+    Debug:
+        from osgeo import gdal
+        raster_path = iface.activeLayer().publicSource()
+        extent = iface.mapCanvas().extent()
+        resolution = (20, 80)
+        resolution = (1920, 1080)
+    """
+    dataset = gdal.Open(raster_path)
+    if dataset is None:
+        raise ValueError("Could not open raster file")
+    srs = osr.SpatialReference()
+    if 0 != srs.ImportFromWkt(dataset.GetProjection()):
+        QgsMessageLog.logMessage(
+            "SpatialReference ImportFromWkt failed (using raster without CRS?)", "Marraqueta", Qgis.Critical
+        )
+    geotransform = dataset.GetGeoTransform()
+    # print(f"{srs=}, {geotransform=}")
+    band = dataset.GetRasterBand(1)
+    # TODO: can we use the overview to speed up the process?
+    # num_overviews = band.GetOverviewCount()
+    # TODO: test raster rotado
+    xoff = int((extent.xMinimum() - geotransform[0]) / geotransform[1])
+    yoff = int((extent.yMaximum() - geotransform[3]) / geotransform[5])
+    xsize = int((extent.xMaximum() - extent.xMinimum()) / geotransform[1])
+    ysize = int((extent.yMinimum() - extent.yMaximum()) / geotransform[5])
+    # print(f"{xoff=} {yoff=} {xsize=} {ysize=}")
+    data = band.ReadAsArray(
+        xoff=xoff, yoff=yoff, win_xsize=xsize, win_ysize=ysize, buf_xsize=resolution[0], buf_ysize=resolution[1]
+    )
+    """
+    ret_array = band1.ReadAsArray(
+        xoff=xoff, yoff=yoff, win_xsize=xsize, win_ysize=ysize, buf_xsize=buf_xsize, buf_ysize=buf_ysize, buf_type=gdal.GDT_Float32
+    )
+    buf_type = 256 levels (0-255) is gdal.GDT_Byte
+    resample_alg = 0 nearest neighbour, ...
+    band1.ReadAsArray(xoff=0, yoff=0, xsize=None, ysize=None, buf_obj=None, buf_xsize=None, buf_ysize=None, buf_type=None, resample_alg=0, callback=None, callback_data=None, interleave='band', band_list=None)
+    print(ret_array.shape, ret_array.dtype)
+    tmp_data  = ret_array
+    final_data = tmp_data
+    """
+    return data, extent, srs
+
+
+def create_sampled_raster(data, extent, srs, *args, **kwargs):
+    """Create a new layer form numpy array data
+    TODO: carry datatype
+    TODO: carry nodata value
+    """
+    # data = final_data.astype(np.float32)
+    data = final_data.astype(np.byte)
+    afile = tempfile.mktemp(suffix=".tif")
+    # dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdal.GDT_Float32)
+    dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdal.GDT_Byte)
+
+    new_geotransform = (
+        extent.xMinimum(),
+        (extent.xMaximum() - extent.xMinimum()) / resolution[0],
+        0,  # TODO: ALLOW ROTATION
+        extent.yMaximum(),
+        0,  # TODO: ALLOW ROTATION
+        (extent.yMinimum() - extent.yMaximum()) / resolution[1],
+    )
+    dataset.SetGeoTransform(new_geotransform)  # specify coords
+    dataset.SetProjection(srs.ExportToWkt())  # export coords to file
+
+    band = dataset.GetRasterBand(1)
+    if 0 != band.SetNoDataValue(-9999):
+        QgsMessageLog.logMessage("Set No Data failed", "Marraqueta", Qgis.Critical)
+    if 0 != band.WriteArray(data):
+        QgsMessageLog.logMessage("WriteArray failed", "Marraqueta", Qgis.Critical)
+
+    paint(band)
+
+    dataset.FlushCache()  # write to disk
+    dataset = None
+    # iface.addRasterLayer(afile, "final_data")
+    return afile
+
+
+def paint(band: gdal.Band, colormap: str = "turbo") -> None:
+    """Paints a gdal raster using band.SetRasterColorTable, only works for Byte and UInt16 bands
+    Args:
+        band (gdal.Band): band to paint
+        colormap (str): name of the colormap to use
+    """
+    if band.DataType == gdal.GDT_Byte:
+        # byte 2**8 = 256
+        num_colors = 256
+    elif band.DataType == gdal.GDT_UInt16:
+        # uint16 2**16 = 65,536
+        num_colors = 65536
+    else:
+        return
+    from matplotlib import colormaps
+    from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+    from numpy import linspace
+
+    cm = colormaps.get(colormap)
+    if isinstance(cm, LinearSegmentedColormap):
+        colors = cm(linspace(0, 1, num_colors))
+    elif isinstance(cm, ListedColormap):
+        colors = cm.resampled(num_colors).colors
+    colors = (colors * 255).astype(int)
+
+    color_table = gdal.ColorTable()
+    for i, color in enumerate(colors):
+        color_table.SetColorEntry(i, color)
+    band.SetRasterColorTable(color_table)

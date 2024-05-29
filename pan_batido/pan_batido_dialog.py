@@ -54,7 +54,7 @@ class MarraquetaDialog(QtWidgets.QDialog):
             # add dropdown menu with options: "min-max", "bi-piecewise-linear", "power", "exponential", "logarithmic
             dropdown = QtWidgets.QComboBox()
             # the order of items is func id
-            dropdown.addItems(["min-max", "bi-piecewise-linear"])
+            dropdown.addItems(["min-max", "bi-piecewise-linear", "experimental"])
             # signal for dropdown menu
             dropdown.currentIndexChanged.connect(self.function_change)
             # add id to the dropdown
