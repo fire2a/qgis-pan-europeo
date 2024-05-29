@@ -1,3 +1,5 @@
+Please mantra-request@osgeo.org, I'm requesting a OSGeo UserID, to this proof of concept plugin!
+
 # Pan European Raster Algorithms (PERA) project
 
 This repository contains the code for the Pan European Raster Algo (PERA) project. The PERA project is a collaboration between PEACH (Protection of Environment and Cultural Heritage) and the FIG(Fire Investigacion and Goverance). The project aims to develop a set of algorithms to process raster data in a distributed computing environment. The algorithms are designed to work with large-scale raster datasets, such as those produced by Technosylva and ERICO.
