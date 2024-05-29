@@ -27,7 +27,9 @@ import tempfile
 import numpy as np
 from fire2a.raster import read_raster
 from osgeo import gdal, osr
-from qgis.core import Qgis, QgsMessageLog
+from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
+                       QgsCoordinateTransform, QgsMessageLog, QgsProject,
+                       QgsRectangle)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
@@ -226,7 +228,8 @@ class Marraqueta:
             self.dlg.rescale_weights()
 
             extent = self.iface.mapCanvas().extent()
-            resolution = (1920, 1080)
+            resolution = resolution_filter(extent, (1920, 1080), 100)
+            QgsMessageLog.logMessage(f"{resolution=}", "Marraqueta", Qgis.Info)
 
             final_data = np.zeros(resolution[::-1], dtype=np.float32)
             did_any = False
@@ -235,28 +238,26 @@ class Marraqueta:
                     weight = dlg_row["weight_spinbox"].value()
                     lyr = self.lyr_data[dlg_row["i"]]
                     lyr_nodata = lyr["info"]["NoDataValue"]
-                    lyr_data, extent, srs = get_sampled_raster_data(
-                        lyr["layer"].publicSource(), extent, resolution=(1920, 1080)
-                    )
-                    match dlg_row["func_dropdown"].currentIndex():
-                        case 0:  # min_max_scaling
-                            new_data = min_max_scaling(
-                                lyr_data, lyr_nodata, invert=dlg_row["minmax_invert"].isChecked()
+                    lyr_data, srs = get_sampled_raster_data(lyr["layer"].publicSource(), extent, resolution)
+                    # utility function dropdown current index
+                    ufdci = dlg_row["func_dropdown"].currentIndex()
+                    if 0 == ufdci:  # min_max_scaling
+                        new_data = min_max_scaling(lyr_data, lyr_nodata, invert=dlg_row["minmax_invert"].isChecked())
+                        did_any = True
+                    elif 1 == ufdci:  # bi_piecewise_linear
+                        a = dlg_row["a_spinbox"].value()
+                        b = dlg_row["b_spinbox"].value()
+                        if a != b:
+                            new_data = bi_piecewise_linear(
+                                lyr_data, lyr_nodata, dlg_row["a_spinbox"].value(), dlg_row["b_spinbox"].value()
                             )
                             did_any = True
-                        case 1:  # bi_piecewise_linear
-                            a = dlg_row["a_spinbox"].value()
-                            b = dlg_row["b_spinbox"].value()
-                            if a != b:
-                                new_data = bi_piecewise_linear(
-                                    lyr_data, lyr_nodata, dlg_row["a_spinbox"].value(), dlg_row["b_spinbox"].value()
-                                )
-                                did_any = True
-                        case 2:  # get_raster_data
-                            tmp_data, extent, srs = get_sampled_raster_data(
-                                lyr["layer"].publicSource(), self.iface.mapCanvas().extent(), resolution=(1920, 1080)
-                            )
-                            QgsMessageLog.logMessage(f"{tmp_data.shape=}, {tmp_data.dtype=}", "Marraqueta", Qgis.Info)
+                        else:
+                            QgsMessageLog.logMessage("a == b, skipping", "Marraqueta", Qgis.Warning)
+                            continue
+                    else:
+                        QgsMessageLog.logMessage("Unknown utility function", "Marraqueta", Qgis.Critical)
+                        return
 
                     QgsMessageLog.logMessage(
                         f"{lyr['layer'].name()=} {np.histogram(new_data)=}", "Marraqueta", Qgis.Info
@@ -267,7 +268,7 @@ class Marraqueta:
                 QgsMessageLog.logMessage("Nothing to do, all layers unselected or 0 weight", "Marraqueta", Qgis.Info)
                 return
 
-            afile = create_sampled_raster(*args, **kwargs)
+            afile = create_sampled_raster(final_data, extent, srs, resolution)
             # add the raster layer to the canvas
             self.iface.addRasterLayer(afile, "final_data")
 
@@ -349,16 +350,17 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080)):
     tmp_data  = ret_array
     final_data = tmp_data
     """
-    return data, extent, srs
+    return data, srs
 
 
-def create_sampled_raster(data, extent, srs, *args, **kwargs):
+def create_sampled_raster(data, extent, srs, resolution, *args, **kwargs):
     """Create a new layer form numpy array data
     TODO: carry datatype
     TODO: carry nodata value
     """
-    # data = final_data.astype(np.float32)
-    data = final_data.astype(np.byte)
+    # data = data.astype(np.byte)
+    # FIXME always float32
+    data = data.astype(np.float32)
     afile = tempfile.mktemp(suffix=".tif")
     # dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdal.GDT_Float32)
     dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdal.GDT_Byte)
@@ -380,7 +382,7 @@ def create_sampled_raster(data, extent, srs, *args, **kwargs):
     if 0 != band.WriteArray(data):
         QgsMessageLog.logMessage("WriteArray failed", "Marraqueta", Qgis.Critical)
 
-    paint(band)
+    # paint(band)
 
     dataset.FlushCache()  # write to disk
     dataset = None
@@ -402,6 +404,7 @@ def paint(band: gdal.Band, colormap: str = "turbo") -> None:
         num_colors = 65536
     else:
         return
+
     from matplotlib import colormaps
     from matplotlib.colors import LinearSegmentedColormap, ListedColormap
     from numpy import linspace
@@ -417,3 +420,33 @@ def paint(band: gdal.Band, colormap: str = "turbo") -> None:
     for i, color in enumerate(colors):
         color_table.SetColorEntry(i, color)
     band.SetRasterColorTable(color_table)
+
+
+def get_extent_size(extent: QgsRectangle):
+    """Returns the width and height of the current displayed extent in meters"""
+    # Create a CRS for meters (for example, WGS 84 / Pseudo-Mercator)
+    crs_meters = QgsCoordinateReferenceSystem("EPSG:3857")
+
+    # Get the current CRS
+    crs_current = QgsProject.instance().crs()
+
+    # Create a coordinate transform
+    transform = QgsCoordinateTransform(crs_current, crs_meters, QgsProject.instance())
+
+    # Transform the extent
+    extent_meters = transform.transformBoundingBox(extent)
+
+    # Get the width and height
+    width = extent_meters.width()
+    height = extent_meters.height()
+    return width, height
+
+
+def resolution_filter(extent: QgsRectangle, resolution=(1920, 1080), pixel_size=100):
+    """Returns a resolution that is at most the input resolution, else returns a smaller one."""
+    extent_with, extent_height = get_extent_size(extent)
+    extent_xpx = int(extent_with / pixel_size)
+    extent_ypx = int(extent_height / pixel_size)
+    resx = resolution[0] if extent_xpx > resolution[0] else extent_xpx
+    resy = intresolution[1] if extent_ypx > resolution[1] else extent_ypx
+    return resx, resy
