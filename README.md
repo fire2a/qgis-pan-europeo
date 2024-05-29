@@ -8,32 +8,37 @@ Put `pan_batido` directory in you qgis plugin folder
 
 ## Current status
 ### Features:
-1. Reads all layers available and draws a dialog with:
+#### 1. Reads all layers available and draws a dialog with:
+
 A. Each row belonging to a layer, containing
 - layer name 
 - weight attributes (checkbox for dis/en-abling, spinbox & slider in 0,100 range) 
 - utility function configuration x2:
 -- Min-Max scaling, with a invert checkbox
 -- Bi-Piecewise-Linear, with spinboxes&sliders for its two 2 points (where the range are the raster min-max values)
+  
 B. A Toolbox with standard buttons (Ok, Cancel, Reset)
 
-2. The user can:
+#### 2. The user can:
 - Press Cancel nothing is done
 - Press Reset to destory current read layers and configuration options
 - Press Ok a new layer is calculated:
 
-3. The new layer is calculated as follows:
+#### 3. The new layer is calculated as follows:
 - The current mapCanvas is selected as extent for the new layer
+- Raster data is gathered up to default (1920x1080 pixels of 100m side) resolution, else is nearest neighbor down-sampled
 - The selected weight attributes are multiplied by the utility function
 
-### TODO:
-1. Two spinboxes with the target resolution of the new raster
-2. A combobox with the resampling method for each layer
+### TODO Roadmap:
+1. Target resolution selector (3 spinboxes with the target resolution of the new raster width, height, pixel size)
+2. Resampling method combobox selector for each layer
+3. DataType target selector float32, uint16 o uint 8
+4. Add and use raster overviews `gdaladdo`
 
 ### Development notes:
 * dialog_base.ui is dummy
-* pan_frances.py is not used right now
-* a installation of fire2-lib is required
+* pan_frances.py is not used right now but will allocate all methods from pan_batido.py except the plugin class itself
+* an installation of fire2-lib will be required, eventually moving common methods outside of pan_batido.py
 ```
 pip install git+https://github.com/fire2a/fire2a-lib.git
 or 
@@ -42,18 +47,20 @@ cd fire2a-lib
 pip install -e .
 ```
 
-#### references
+# Dev Notes References
 
-nodata = band.GetNoDataValue()
-rasterArray = np.ma.masked_equal(rasterArray, nodata)
-raster = None
-band = None
+    nodata = band.GetNoDataValue()
+    rasterArray = np.ma.masked_equal(rasterArray, nodata)
+    raster = None
+    band = None
 
 https://gdal.org/api/python/raster_api.html#osgeo.gdal.Band.ReadAsArray
+    
     resample_alg (int, default = gdal.GRIORA_NearestNeighbour.) -- Specifies the resampling algorithm to use when the size of the read window and the buffer are not equal.
 
-[ins] In [2]: gdal.GRIORA_Average, gdal.GRIORA_Bilinear, gdal.GRIORA_Cubic, gdal.GRIORA_CubicSpline, gdal.GRIORA_Gauss, gdal.GRIORA_Lanczos, gdal.GRIORA_Mode, gdal.GRIORA_NearestNeighbour, gdal.GRIO
-Out[2]: (5, 1, 2, 3, 7, 4, 6, 0, 14)
+    [ins] In [2]: gdal.GRIORA_Average, gdal.GRIORA_Bilinear, gdal.GRIORA_Cubic, gdal.GRIORA_CubicSpline, gdal.GRIORA_Gauss, gdal.GRIORA_Lanczos, gdal.GRIORA_Mode, gdal.GRIORA_NearestNeighbour, gdal.GRIO
+    Out[2]: (5, 1, 2, 3, 7, 4, 6, 0, 14)
+
         Nearest Neighbor (gdal.GRIORA_NearestNeighbour):
         This is the default and fastest algorithm.
         It assigns the value of the closest pixel in the original raster to the corresponding pixel in the output array.
@@ -90,6 +97,7 @@ Out[2]: (5, 1, 2, 3, 7, 4, 6, 0, 14)
         It can be useful for smoothing noisy data but may blur sharp features.
 
 https://gdal.org/programs/gdaladdo.html
+
     gdaladdo [--help] [--help-general]
              [-r {nearest|average|rms|gauss|cubic|cubicspline|lanczos|average_mp|average_magphase|mode}]
              [-ro] [-clean] [-q] [-oo <NAME>=<VALUE>]... [-minsize <val>]
