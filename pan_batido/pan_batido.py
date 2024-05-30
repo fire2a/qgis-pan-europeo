@@ -450,3 +450,16 @@ def resolution_filter(extent: QgsRectangle, resolution=(1920, 1080), pixel_size=
     resx = resolution[0] if extent_xpx > resolution[0] else extent_xpx
     resy = resolution[1] if extent_ypx > resolution[1] else extent_ypx
     return resx, resy
+
+
+def current_displayed_pixels(iface):
+    extent = iface.mapCanvas().extent()
+    layer = iface.activeLayer()
+    px_size_x = layer.rasterUnitsPerPixelX()
+    px_size_y = layer.rasterUnitsPerPixelY()
+    xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x )
+    ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y )
+    return xsize, ysize
+
+def qprint(*args, tag = 'Marraqueta', level = Qgis.Info, sep=' ', end='\n', **kwargs):
+    QgsMessageLog.logMessage(sep.join(args)+end, tag, level, **kwargs)

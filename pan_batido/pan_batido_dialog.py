@@ -24,7 +24,8 @@
 """
 
 
-from qgis.core import QgsMessageLog
+from qgis.core import QgsMessageLog, Qgis
+from qgis.gui import QgsMapCanvas
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtCore import Qt
 from qgis.utils import iface
@@ -34,7 +35,7 @@ class MarraquetaDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         """Constructor."""
         super(MarraquetaDialog, self).__init__(parent)
-        QgsMessageLog.logMessage("MarraquetaDialog.__init__", "Marraqueta")
+        qprint("MarraquetaDialog.__init__")
         # set window title to Pan Europeo
         self.setWindowTitle("Pan Europeo (layer, weights, utility function)")
         self.verticalLayout = QtWidgets.QVBoxLayout()
@@ -112,6 +113,10 @@ class MarraquetaDialog(QtWidgets.QDialog):
         self.verticalLayout.addWidget(self.buttonBox)
         # self.setupUi(self)
 
+        # setup signal on map canvas scale change
+        # self.canvas = QgsMapCanvas()
+        # QgsMapCanvas().scaleChanged.connect(self.scale_changed)
+
     def reject(self):
         self.destroy()
 
@@ -147,6 +152,19 @@ class MarraquetaDialog(QtWidgets.QDialog):
                 else:
                     elto.setVisible(False)
 
+    """
+    def scale_changed(self, *args, **kwargs):
+        """update the range of the sliders"""
+        qprint("update_z_range {args=}, {kwargs=}")
+        if iface.activeLayer():
+            extent = iface.mapCanvas().extent()
+            layer = iface.activeLayer()
+            px_size_x = layer.rasterUnitsPerPixelX()
+            px_size_y = layer.rasterUnitsPerPixelY()
+            xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x )
+            ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y )
+            qprint(f"{xsize=}, {ysize=}")
+    """
 
 def link_spinbox_slider(slider, spinbox):
     """Link a QSpinBox, QSlider"""
@@ -175,3 +193,6 @@ def link_spinbox_slider_checkbox(spinbox, slider, checkbox):
 
     checkbox.stateChanged.connect(set_enabled)
     checkbox.setChecked(True)
+
+def qprint(*args, tag = 'Marraqueta', level = Qgis.Info, sep=' ', end='\n', **kwargs):
+    QgsMessageLog.logMessage(sep.join(args)+end, tag, level, **kwargs)
