@@ -448,5 +448,5 @@ def resolution_filter(extent: QgsRectangle, resolution=(1920, 1080), pixel_size=
     extent_xpx = int(extent_with / pixel_size)
     extent_ypx = int(extent_height / pixel_size)
     resx = resolution[0] if extent_xpx > resolution[0] else extent_xpx
-    resy = intresolution[1] if extent_ypx > resolution[1] else extent_ypx
+    resy = resolution[1] if extent_ypx > resolution[1] else extent_ypx
     return resx, resy
