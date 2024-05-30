@@ -168,8 +168,22 @@ class Marraqueta:
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )
 
+        self.mc = self.iface.mapCanvas()
+        self.mc.scaleChanged.connect(self.handle_change)
+
         # will be set False in run()
         self.first_start = True
+
+    def handle_change(self, x):
+        if iface.activeLayer():
+            extent = iface.mapCanvas().extent()
+            layer = iface.activeLayer()
+            px_size_x = layer.rasterUnitsPerPixelX()
+            px_size_y = layer.rasterUnitsPerPixelY()
+            xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x)
+            ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y)
+            qprint(f"{xsize=}, {ysize=}")
+        qprint(f"zoom scale is {x}")
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -220,16 +234,15 @@ class Marraqueta:
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        QgsMessageLog.logMessage(f"{result=} {self.dlg.DialogCode()=}", "Marraqueta", Qgis.Info)
+        qprint(f"{result=} {self.dlg.DialogCode()=}")
         # See if OK was pressed
         if result:
-            QgsMessageLog.logMessage("OK clicked", "Marraqueta", Qgis.Info)
-
             self.dlg.rescale_weights()
 
             extent = self.iface.mapCanvas().extent()
+            qprint(f"{extent=}")
             resolution = resolution_filter(extent, (1920, 1080), 100)
-            QgsMessageLog.logMessage(f"{resolution=}", "Marraqueta", Qgis.Info)
+            qprint(f"{resolution=}")
 
             final_data = np.zeros(resolution[::-1], dtype=np.float32)
             did_any = False
@@ -439,6 +452,7 @@ def get_extent_size(extent: QgsRectangle):
     # Get the width and height
     width = extent_meters.width()
     height = extent_meters.height()
+    qprint(f"get_extent_size  {width=}, {height=}")
     return width, height
 
 
@@ -449,6 +463,7 @@ def resolution_filter(extent: QgsRectangle, resolution=(1920, 1080), pixel_size=
     extent_ypx = int(extent_height / pixel_size)
     resx = resolution[0] if extent_xpx > resolution[0] else extent_xpx
     resy = resolution[1] if extent_ypx > resolution[1] else extent_ypx
+    qprint(f"resolution_filter {resx=}, {resy=}")
     return resx, resy
 
 
@@ -457,9 +472,10 @@ def current_displayed_pixels(iface):
     layer = iface.activeLayer()
     px_size_x = layer.rasterUnitsPerPixelX()
     px_size_y = layer.rasterUnitsPerPixelY()
-    xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x )
-    ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y )
+    xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x)
+    ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y)
     return xsize, ysize
 
-def qprint(*args, tag = 'Marraqueta', level = Qgis.Info, sep=' ', end='\n', **kwargs):
-    QgsMessageLog.logMessage(sep.join(args)+end, tag, level, **kwargs)
+
+def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="\n", **kwargs):
+    QgsMessageLog.logMessage(sep.join(args) + end, tag, level, **kwargs)
