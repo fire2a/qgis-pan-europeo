@@ -1,0 +1,59 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-beta'
+
+permissions:
+  contents: write
+
+jobs:
+  build-n-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Version bump
+      run: |
+         VERSION=${GITHUB_REF_NAME#v}
+         echo "version is ${VERSION}"
+         sed -i -e "s/version=0.0.1/version=${VERSION}/" pan_batido/metadata.txt
+         git add pan_batido/metadata.txt
+
+    - name: Checkout fire2a-lib
+      uses: actions/checkout@master
+      with:
+        repository: "fire2a/fire2a-lib" 
+        path: "fire2a"
+        sparse-checkout: |
+          src/fire2a/raster.py
+          src/fire2a/utils.py
+        sparse-checkout-cone-mode: false
+
+    - name: git archive
+      run: |
+         echo "Changing fire2a from installed to relative import"
+         mkdir -p pan_batido/fire2a
+         mv src/fire2a/raster.py pan_batido/fire2a
+         mv src/fire2a/utils.py pan_batido/fire2a
+         # rm -rf fire2a
+         grep -Rl --include=*py "from fire2a" | tee will.change | xargs -I {} sed -i "s/^from fire2a/from .fire2a/" {}
+         echo "Changed files"
+         cat will.change 
+         # rm will.change
+
+         git add pan_batido/fire2a
+         lestash=`git stash create`
+
+         git archive --output "pan_batido_${{ github.ref_name }}.zip" $lestash pan_batido
+
+    - name: Create Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: "pan_batido_${{ github.ref_name }}.zip"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: true
