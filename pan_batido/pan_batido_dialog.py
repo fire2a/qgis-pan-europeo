@@ -23,13 +23,17 @@
  ***************************************************************************/
 """
 
+from functools import partial
 
-from qgis.core import Qgis, QgsMessageLog
+from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QHBoxLayout,
-                                 QLabel, QSlider, QSpinBox, QVBoxLayout)
+                                 QLabel, QSizePolicy, QSlider, QSpacerItem,
+                                 QSpinBox, QVBoxLayout)
 from qgis.utils import iface
+
+from .config import DATATYPES, GRIORAS, qprint
 
 
 class MarraquetaDialog(QDialog):
@@ -38,7 +42,7 @@ class MarraquetaDialog(QDialog):
         super(MarraquetaDialog, self).__init__(parent)
         qprint("MarraquetaDialog.__init__")
         # set window title to Pan Europeo
-        self.setWindowTitle("Pan Europeo (layer, weights, utility function)")
+        self.setWindowTitle("Pan Europeo Baguette Marraqueta Coliza Hallulla")
         self.verticalLayout = QVBoxLayout()
         self.setLayout(self.verticalLayout)
 
@@ -52,6 +56,10 @@ class MarraquetaDialog(QDialog):
         # for each layer a row of controls
         self.rows = []
         for i, layer in enumerate(iface.mapCanvas().layers()):
+            if layer.publicSource() == "":
+                qprint(
+                    f"layer {layer.name()} has no public source, skipping (is it written locally?)", level=Qgis.Warning
+                )
             # name
             self.grid.addWidget(QLabel(layer.name()), i + 1, 0)
             # weight
@@ -59,7 +67,8 @@ class MarraquetaDialog(QDialog):
             checkbox = QCheckBox()
             spinbox = QSpinBox()
             slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider_checkbox(spinbox, slider, checkbox)
+            link_spinbox_slider(spinbox, slider)
+            # link_spinbox_slider_checkbox(spinbox, slider, checkbox)
             weight_layout.addWidget(checkbox)
             weight_layout.addWidget(spinbox)
             weight_layout.addWidget(slider)
@@ -67,9 +76,7 @@ class MarraquetaDialog(QDialog):
             # resample
             resample_dropdown = QComboBox()
             # NO REORDER:
-            resample_dropdown.addItems(
-                ["Nearest Neighbor", "Bilinear", "Cubic", "Cubic Spline", "Lanczos", "Mode", "Average", "Gauss"]
-            )
+            resample_dropdown.addItems(list(GRIORAS.keys()))
             resample_dropdown.row_id = i
             self.grid.addWidget(resample_dropdown, i + 1, 2)
             # utility function
@@ -104,6 +111,22 @@ class MarraquetaDialog(QDialog):
                 elto.setVisible(False)
                 ufunc_layout.addWidget(elto)
 
+            checkbox.setChecked(True)
+            checkbox.stateChanged.connect(
+                partial(
+                    set_enabled,
+                    spinbox,
+                    slider,
+                    resample_dropdown,
+                    ufunc_dropdown,
+                    cb,
+                    a_spinbox,
+                    a_slider,
+                    b_spinbox,
+                    b_slider,
+                )
+            )
+
             self.grid.addLayout(ufunc_layout, i + 1, 3)
             self.rows += [
                 {
@@ -122,6 +145,32 @@ class MarraquetaDialog(QDialog):
                 }
             ]
         self.verticalLayout.addLayout(self.grid)
+
+        self.verticalLayout.addItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        # target resolution x,y; pixel size, data type
+        self.target_layout = QHBoxLayout()
+        self.target_layout.addWidget(QLabel("target resolution width[px]:"))
+        self.resolution_x = QSpinBox()
+        self.resolution_x.setRange(1, 2147483647)
+        self.resolution_x.setValue(1920)
+        self.target_layout.addWidget(self.resolution_x)
+        self.target_layout.addWidget(QLabel("height[px]:"))
+        self.resolution_y = QSpinBox()
+        self.resolution_y.setRange(1, 2147483647)
+        self.resolution_y.setValue(1080)
+        self.target_layout.addWidget(self.resolution_y)
+        self.target_layout.addWidget(QLabel("pixel size[m]:"))
+        self.pixel_size = QSpinBox()
+        self.pixel_size.setRange(1, 2147483647)
+        self.pixel_size.setValue(100)
+        self.target_layout.addWidget(self.pixel_size)
+        self.target_layout.addWidget(QLabel("data type:"))
+        self.data_type = QComboBox()
+        self.data_type.addItems(list(DATATYPES.keys()))
+        self.data_type.setCurrentIndex(2)
+        self.target_layout.addWidget(self.data_type)
+        self.verticalLayout.addLayout(self.target_layout)
 
         # add a QtButtonBox to the bottom of the dialog with Ok, and Cancel
         self.buttonBox = QDialogButtonBox(
@@ -160,7 +209,7 @@ class MarraquetaDialog(QDialog):
         # def function_change(self, *args, **kwargs):
         # QgsMessageLog.logMessage(f"{args=}, {kwargs=}", "Marraqueta")
         # args=(1,), kwargs={}
-        QgsMessageLog.logMessage(f"dropdown {idx=} {self.sender().row_id=}", "Marraqueta")
+        # qprint(f"dropdown {idx=} {self.sender().row_id=}")
         # identify row
         row = self.rows[self.sender().row_id]
         # iterate over func_id elements
@@ -187,19 +236,7 @@ def link_spinbox_slider(slider, spinbox):
     slider.valueChanged.connect(set_spinbox_value)
 
 
-def link_spinbox_slider_checkbox(spinbox, slider, checkbox):
-    """Link a QSpinBox, QSlider and QCheckBox together."""
-    spinbox.setRange(0, 100)
-    slider.setRange(0, 100)
-    link_spinbox_slider(slider, spinbox)
-
-    def set_enabled(value):
-        spinbox.setEnabled(value)
-        slider.setEnabled(value)
-
-    checkbox.stateChanged.connect(set_enabled)
-    checkbox.setChecked(True)
-
-
-def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="\n", **kwargs):
-    QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)
+def set_enabled(*args):
+    value = args[-1]
+    for widget in args[:-1]:
+        widget.setEnabled(value)

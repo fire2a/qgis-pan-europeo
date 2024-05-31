@@ -23,17 +23,19 @@
 """
 import os.path
 import tempfile
+from pathlib import Path
 
 import numpy as np
 from fire2a.raster import read_raster
-from osgeo import gdal, osr
+from osgeo import gdal
+from osgeo.osr import SpatialReference
 from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
-                       QgsCoordinateTransform, QgsMessageLog, QgsProject,
-                       QgsRectangle)
+                       QgsCoordinateTransform, QgsProject, QgsRectangle)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
+from .config import DATATYPES, GRIORAS, qprint
 # Import the code for the dialog
 from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
@@ -222,7 +224,7 @@ class Marraqueta:
             self.W = self.lyr_data[0]["info"]["RasterXSize"]
             self.GT = self.lyr_data[0]["info"]["Transform"]
             self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
-            self.srs = osr.SpatialReference().ImportFromWkt(self.lyr_data[0]["layer"].crs().toWkt())
+            self.srs = SpatialReference().ImportFromWkt(self.lyr_data[0]["layer"].crs().toWkt())
             qprint(f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}, srs:{self.srs}")
             qprint("not checking if rasters match!", level=Qgis.Warning)
 
@@ -237,37 +239,60 @@ class Marraqueta:
 
             extent = self.iface.mapCanvas().extent()
             qprint(f"{extent=}")
-            resolution = resolution_filter(extent, (1920, 1080), 100)
+            ppta_x = self.dlg.resolution_x.value()
+            ppta_y = self.dlg.resolution_y.value()
+            px_size = self.dlg.pixel_size.value()
+            data_type = self.dlg.data_type.currentText()
+            print(f"{ppta_x=}, {ppta_y=}, {px_size=}")
+            resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
             qprint(f"{resolution=}")
 
-            final_data = np.zeros(resolution[::-1], dtype=np.float32)
+            final_data = np.zeros(resolution[::-1], dtype=DATATYPES[data_type]["numpy"])
             did_any = False
             for dlg_row in self.dlg.rows:
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
                     weight = dlg_row["weight_spinbox"].value()
                     lyr = self.lyr_data[dlg_row["i"]]
                     lyr_nodata = lyr["info"]["NoDataValue"]
-                    griora = dlg_row["resample_dropdown"].currentIndex()
-                    lyr_data, srs = get_sampled_raster_data(lyr["layer"].publicSource(), extent, resolution, griora)
+                    # get data
+                    lyr_data, srs = get_sampled_raster_data(
+                        lyr["layer"].publicSource(),
+                        extent,
+                        resolution,
+                        GRIORAS[dlg_row["resample_dropdown"].currentText()],
+                        DATATYPES[data_type]["gdal"],
+                    )
                     # utility function dropdown current index
                     ufdci = dlg_row["ufunc_dropdown"].currentIndex()
-                    if 0 == ufdci:  # min_max_scaling
-                        new_data = min_max_scaling(lyr_data, lyr_nodata, invert=dlg_row["minmax_invert"].isChecked())
+                    # min_max_scaling
+                    if 0 == ufdci:
+                        new_data = min_max_scaling(
+                            lyr_data,
+                            lyr_nodata,
+                            invert=dlg_row["minmax_invert"].isChecked(),
+                            dtype=DATATYPES[data_type]["numpy"],
+                        )
                         did_any = True
-                    elif 1 == ufdci:  # bi_piecewise_linear
+                    # bi_piecewise_linear
+                    elif 1 == ufdci:
                         a = dlg_row["a_spinbox"].value()
                         b = dlg_row["b_spinbox"].value()
                         if a != b:
                             new_data = bi_piecewise_linear(
-                                lyr_data, lyr_nodata, dlg_row["a_spinbox"].value(), dlg_row["b_spinbox"].value()
+                                lyr_data,
+                                lyr_nodata,
+                                dlg_row["a_spinbox"].value(),
+                                dlg_row["b_spinbox"].value(),
+                                dtype=DATATYPES[data_type]["numpy"],
                             )
                             did_any = True
                         else:
                             qprint("a == b, skipping", level=Qgis.Warning)
                             continue
                     else:
-                        qprint("Unknown utility function", level=Qgis.Critical)
-                        return
+                        from qgis.core import QgsException
+
+                        raise QgsException(f"Utility function at index:{ufdci} not implemented")
 
                     qprint(f"{lyr['layer'].name()=} {np.histogram(new_data)=}")
                     final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
@@ -276,45 +301,58 @@ class Marraqueta:
                 qprint("Nothing to do, all layers unselected or 0 weight")
                 return
 
-            afile = create_sampled_raster(final_data, extent, srs, resolution)
+            afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
+            # name the layer as resolution, pixel size and data type, and HHMMSS
+            qprint(
+                f"Created {afile=}, {resolution=}, {px_size=}, {data_type=}",
+                level=Qgis.Success,
+            )
             # add the raster layer to the canvas
-            self.iface.addRasterLayer(afile, "final_data")
+            self.iface.addRasterLayer(afile, Path(afile).stem)
 
 
-def min_max_scaling(data, nodata, invert=False):
+def min_max_scaling(data, nodata, invert=False, dtype=None):
     min_val = data[data != nodata].min()
     max_val = data[data != nodata].max()
     if max_val != min_val:
         ret_val = (data - min_val) / (max_val - min_val)
         if invert:
-            return np.float32(1 - ret_val)
-        return np.float32(ret_val)
+            if dtype == uint8:
+                return np.uint8(255 - ret_val)
+            elif dtype == uint16:
+                return np.uint16(65535 - ret_val)
+            else:
+                return 1 - ret_val
+        return ret_val
     else:
-        return np.zeros_like(data, dtype=np.float32)
+        return np.zeros_like(data)
 
 
-def bi_piecewise_linear(data, nodata, a, b):
-    ret_val = np.empty_like(data, dtype=np.float32)
+def bi_piecewise_linear(data, nodata, a, b, dtype=None):
+    ret_val = np.empty_like(data)
     # linear scaling
     ret_val[data != nodata] = (data[data != nodata] - a) / (b - a)
     # clip to [0, 1]
+    # TODO FIX DATATYPES? uint8, uint16 ?
     ret_val[ret_val < 0] = 0
     ret_val[ret_val > 1] = 1
     # keep nodata values
     ret_val[data == nodata] = data[data == nodata]
-    return np.float32(ret_val)
+    return ret_val
 
 
-def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0):
+def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0, gdt=7, *args, **kwargs):
     """Returns the data of the raster in the form of a numpy array, taken from the extent of the map canvas and resampled to resolution
     Args:
         raster_path (str): path to the raster file
         extent (QgsRectangle): extent of the map canvas
-        resolution (tuple): resolution of the output array
+        resolution (tuple): resolution of the output array, defaults to 1920x1080
+        griora (int): gdal resampling interpolation raster algorithm, defaults to nearest neighbour
+        gdt (int): gdal data type, defaults to float64
     Return:
         data (np.array): numpy array with the data of the raster
         extent (QgsRectangle): extent of the map canvas
-        srs (osr.SpatialReference): spatial reference of the raster
+        srs (osgeo.osr.SpatialReference): spatial reference of the raster
     Raises:
         ValueError: if the raster file could not be opened by gdal.Open
 
@@ -328,7 +366,7 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
     dataset = gdal.Open(raster_path)
     if dataset is None:
         raise ValueError("Could not open raster file")
-    srs = osr.SpatialReference()
+    srs = SpatialReference()
     if 0 != srs.ImportFromWkt(dataset.GetProjection()):
         qprint(f"SpatialReference ImportFromWkt failed {raster_path=} (maybe raster without CRS?)", level=Qgis.Critical)
     geotransform = dataset.GetGeoTransform()
@@ -350,6 +388,8 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
         buf_xsize=resolution[0],
         buf_ysize=resolution[1],
         resample_alg=griora,
+        buf_type=gdt,
+        callback=progress_callback,
     )
     """
     ret_array = band1.ReadAsArray(
@@ -365,17 +405,11 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
     return data, srs
 
 
-def create_sampled_raster(data, extent, srs, resolution, *args, **kwargs):
-    """Create a new layer form numpy array data
-    TODO: carry datatype
-    TODO: carry nodata value
-    """
-    # data = data.astype(np.byte)
-    # FIXME always float32
-    data = data.astype(np.float32)
+def create_sampled_raster(data, extent, srs, resolution, gdt=7, *args, **kwargs):
+    """Create a new layer form numpy array data"""
+    # TODO: carry nodata value
     afile = tempfile.mktemp(suffix=".tif")
-    # dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdal.GDT_Float32)
-    dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdal.GDT_Byte)
+    dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdt)
 
     new_geotransform = (
         extent.xMinimum(),
@@ -476,5 +510,7 @@ def current_displayed_pixels(iface):
     return xsize, ysize
 
 
-def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="", **kwargs):
-    QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)
+def progress_callback(complete, message, data):
+    # Write a message to the QGIS message log
+    qprint(f"Progress: {complete * 100}%")
+    return 1  # Return 1 to continue processing, or 0 to cancel
