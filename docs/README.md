@@ -1,5 +1,11 @@
 # Pan European Proof of Concept
 
+- [Quick start](#quick-start)
+- [How to use](#how-to-use)
+  * [Raster configuration](#raster-configuration)
+  * [Resampling methods](#resampling-methods)
+- [About us](#about-us)
+
 This QGIS plugin allows its users to calculate a summary cualitative raster from a set of large input rasters; by defining for each one its relative weight, utility attribute function parameters, and a resampling method.
 Because the plugin is intended to process ~30 rasters at 100m pixel resolution (~30xGiB of data) a resampling method and target precision configuration is provided; Although the plugin can work with any available raster layers.
 Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will be hosting them soon enough!
@@ -75,3 +81,13 @@ Each target raster is expected to have billion pixels and the resampling method 
     Gauss:
         This method utilizes a Gaussian distribution to weight the values of neighboring pixels in the original raster.
         It can be useful for datasets with continuous variation but is less common than other resampling methods.
+
+# About us
+| Role | Where | Method |
+| --- | --- | --- | 
+| Outreach |  https://www.fire2a.com | fire2a@fire2a.com | 
+| User docs |  https://fire2a.github.io/docs/ | github-issues "forum" |
+| Algorithms docs |  https://fire2a.github.io/fire2a-lib/ | Pull Requests |
+| Developer docs |  https://www.github.com/fire2a | Pull Requests |
+
+Developed by fdobad.82 @ (Signal App)[https://signal.org/]

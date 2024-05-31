@@ -182,6 +182,19 @@ class MarraquetaDialog(QDialog):
             if button.text() == "Reset":
                 button.clicked.connect(self.reset)
 
+        hl = QHBoxLayout()
+        label = QLabel()
+        label.setText('<a href="https://fire2a.github.io/qgis-pan-europeo/">user manual</a>')
+        label.setOpenExternalLinks(True)
+        label.setAlignment(Qt.AlignLeft)
+        hl.addWidget(label)
+        label = QLabel()
+        label.setText('<a href="https://github.com/fire2a/qgis-pan-europeo/issues">issues</a>')
+        label.setOpenExternalLinks(True)
+        label.setAlignment(Qt.AlignRight)
+        hl.addWidget(label)
+        self.verticalLayout.addLayout(hl)
+
         self.verticalLayout.addWidget(self.buttonBox)
         # self.setupUi(self)
 
