@@ -20,13 +20,20 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
 - All (vertical tab on the left) > Search for "Pan European Proof of Concept" (top horizontal input) > Select the plugin (checkbox) > Click "Install" (bottom right)
 - The plugin will be available on the "Plugins" section of the toolbar or on the "Plugins" menu, by clicking on the icon:
   
-<p align="center">
- 
-| plugin icon |
-|:---:|
-| <img src="marraqueta3.png" alt="toolbar-icon" width="50%" height="50%"> |
-
-</p>
+<div align="center">
+    <table>
+        <thead>
+            <tr>
+                <th>plugin icon</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><img src="marraqueta3.png" alt="toolbar-icon" style="width:50%; height:50%;"></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 ## How to use
 1. Open QGIS 
