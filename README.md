@@ -56,6 +56,11 @@ pip install -e .
     raster = None
     band = None
 
+    min = band.GetMinimum()
+    max = band.GetMaximum()
+    if not min or not max:
+        (min,max) = band.ComputeRasterMinMax(True)
+
 https://gdal.org/api/python/raster_api.html#osgeo.gdal.Band.ReadAsArray
     
     resample_alg (int, default = gdal.GRIORA_NearestNeighbour.) -- Specifies the resampling algorithm to use when the size of the read window and the buffer are not equal.

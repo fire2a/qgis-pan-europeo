@@ -243,7 +243,7 @@ class Marraqueta:
             ppta_y = self.dlg.resolution_y.value()
             px_size = self.dlg.pixel_size.value()
             data_type = self.dlg.data_type.currentText()
-            print(f"{ppta_x=}, {ppta_y=}, {px_size=}")
+            qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
             resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
             qprint(f"{resolution=}")
 
@@ -510,7 +510,6 @@ def current_displayed_pixels(iface):
     return xsize, ysize
 
 
-def progress_callback(complete, message, data):
-    # Write a message to the QGIS message log
-    qprint(f"Progress: {complete * 100}%")
+def progress_callback(pct, message, data, *args, **kwargs):
+    qprint(f"progress_callback {pct=} {message=} {data=} {args=} {kwargs=}")
     return 1  # Return 1 to continue processing, or 0 to cancel
