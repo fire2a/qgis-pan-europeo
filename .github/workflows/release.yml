@@ -38,8 +38,8 @@ jobs:
       run: |
          echo "Changing fire2a from installed to relative import"
          mkdir -p pan_batido/fire2a
-         mv src/fire2a/raster.py pan_batido/fire2a
-         mv src/fire2a/utils.py pan_batido/fire2a
+         mv fire2a/src/fire2a/raster.py pan_batido/fire2a
+         mv fire2a/src/fire2a/utils.py pan_batido/fire2a
          # rm -rf fire2a
          grep -Rl --include=*py "from fire2a" | tee will.change | xargs -I {} sed -i "s/^from fire2a/from .fire2a/" {}
          echo "Changed files"
