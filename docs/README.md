@@ -7,7 +7,9 @@
 - [About us](#about-us)
 
 This QGIS plugin allows its users to calculate a summary cualitative raster from a set of large input rasters; by defining for each one its relative weight, utility attribute function parameters, and a resampling method.
+
 Because the plugin is intended to process ~30 rasters at 100m pixel resolution (~30xGiB of data) a resampling method and target precision configuration is provided; Although the plugin can work with any available raster layers.
+
 Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will be hosting them soon enough!
 
 ![user-interface](ui.png)
@@ -17,7 +19,14 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
 - On the QGIS menu, go to Plugins > Manage and Install Plugins 
 - All (vertical tab on the left) > Search for "Pan European Proof of Concept" (top horizontal input) > Select the plugin (checkbox) > Click "Install" (bottom right)
 - The plugin will be available on the "Plugins" section of the toolbar or on the "Plugins" menu, by clicking on the icon:
-![toolbar-icon](marraqueta3.png)
+  
+<p align="center">
+ 
+| plugin icon |
+|:---:|
+| <img src="marraqueta3.png" alt="toolbar-icon" width="50%" height="50%"> |
+
+</p>
 
 ## How to use
 1. Open QGIS 
@@ -25,8 +34,8 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
     - optional: open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "Marraqueta" tab
 2. Load a set of raster layers
 3. Click on the "Pan European Proof of Concept" plugin icon
-4. Configure for each layer/row (see details below)
-5. Configure target resolution (optional)
+4. Configure for each layer/row (see details [below](#raster-configuration))
+5. (TODO) Configure target resolution (optional)
 6. Buttons: 
 ```
 Reset: to clear the dialog, load another set of layers
@@ -39,10 +48,10 @@ Ok: to calculate a new layer
 For each available layer (must be local and written to disk) available configurations are:
 1. Layer enable/disable checkbox
 2. Weight attributes as spinbox & slider (they get adjusted to sum 100 at run time)
-3. Resample method combobox selector (see details below)
-4. Utility function configuration, select between:
-a. Min-Max scaling, with a invert values checkbox
-b. Bi-Piecewise-Linear, with its two breakpoint setup as spinbox & slider (inverts when the second is lower than the first)
+3. Resample method combobox selector (see details [below](#resampling-methods))
+4. Utility function configuration, select between:  
+   a. Min-Max scaling, with a invert values checkbox  
+   b. Bi-Piecewise-Linear, with its two breakpoint setup as spinbox & slider (inverts when the second is lower than the first)  
 
 ### Resampling methods
 Each target raster is expected to have billion pixels and the resampling method is crucial to the final result in a reasonable time. The following methods are available:
@@ -83,6 +92,7 @@ Each target raster is expected to have billion pixels and the resampling method 
         It can be useful for datasets with continuous variation but is less common than other resampling methods.
 
 # About us
+
 | Role | Where | Method |
 | --- | --- | --- | 
 | Outreach |  https://www.fire2a.com | fire2a@fire2a.com | 
@@ -90,4 +100,4 @@ Each target raster is expected to have billion pixels and the resampling method 
 | Algorithms docs |  https://fire2a.github.io/fire2a-lib/ | Pull Requests |
 | Developer docs |  https://www.github.com/fire2a | Pull Requests |
 
-Developed by fdobad.82 @ (Signal App)[https://signal.org/]
+Developed by fdobad.82 @ [Signal App](https://signal.org)
