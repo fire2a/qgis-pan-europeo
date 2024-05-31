@@ -6,7 +6,7 @@
 name=Pan Europeo
 qgisMinimumVersion=3.36
 description=Ponders different rasters with different utility functions
-version=v0.0.1
+version=0.0.1
 author=fdobad@github
 email=fbadilla@ing.uchile.cl
 
