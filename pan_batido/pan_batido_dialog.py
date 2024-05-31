@@ -25,64 +25,86 @@
 
 
 from qgis.core import Qgis, QgsMessageLog
-from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
+                                 QDialogButtonBox, QGridLayout, QHBoxLayout,
+                                 QLabel, QSlider, QSpinBox, QVBoxLayout)
 from qgis.utils import iface
 
 
-class MarraquetaDialog(QtWidgets.QDialog):
+class MarraquetaDialog(QDialog):
     def __init__(self, parent=None):
         """Constructor."""
         super(MarraquetaDialog, self).__init__(parent)
         qprint("MarraquetaDialog.__init__")
         # set window title to Pan Europeo
         self.setWindowTitle("Pan Europeo (layer, weights, utility function)")
-        self.verticalLayout = QtWidgets.QVBoxLayout()
+        self.verticalLayout = QVBoxLayout()
         self.setLayout(self.verticalLayout)
+
+        # each row is a name | weight | resample | utility function
+        self.grid = QGridLayout()
+        self.grid.addWidget(QLabel("raster"), 0, 0)
+        self.grid.addWidget(QLabel("weight"), 0, 1)
+        self.grid.addWidget(QLabel("resample/interpolation algo."), 0, 2)
+        self.grid.addWidget(QLabel("utility func."), 0, 3)
+
         # for each layer a row of controls
         self.rows = []
         for i, layer in enumerate(iface.mapCanvas().layers()):
-            horizontalLayout = QtWidgets.QHBoxLayout()
-            horizontalLayout.addWidget(QtWidgets.QLabel(layer.name()))
-            checkbox = QtWidgets.QCheckBox()
-            spinbox = QtWidgets.QSpinBox()
-            slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+            # name
+            self.grid.addWidget(QLabel(layer.name()), i + 1, 0)
+            # weight
+            weight_layout = QHBoxLayout()
+            checkbox = QCheckBox()
+            spinbox = QSpinBox()
+            slider = QSlider(Qt.Orientation.Horizontal)
             link_spinbox_slider_checkbox(spinbox, slider, checkbox)
-            horizontalLayout.addWidget(checkbox)
-            horizontalLayout.addWidget(spinbox)
-            horizontalLayout.addWidget(slider)
-            # add dropdown menu with options: "min-max", "bi-piecewise-linear", "power", "exponential", "logarithmic
-            dropdown = QtWidgets.QComboBox()
-            # the order of items is func id
-            dropdown.addItems(["min-max", "bi-piecewise-linear", "experimental"])
-            # signal for dropdown menu
-            dropdown.currentIndexChanged.connect(self.function_change)
+            weight_layout.addWidget(checkbox)
+            weight_layout.addWidget(spinbox)
+            weight_layout.addWidget(slider)
+            self.grid.addLayout(weight_layout, i + 1, 1)
+            # resample
+            resample_dropdown = QComboBox()
+            # NO REORDER:
+            resample_dropdown.addItems(
+                ["Nearest Neighbor", "Bilinear", "Cubic", "Cubic Spline", "Lanczos", "Mode", "Average", "Gauss"]
+            )
+            resample_dropdown.row_id = i
+            self.grid.addWidget(resample_dropdown, i + 1, 2)
+            # utility function
+            ufunc_layout = QHBoxLayout()
+            ufunc_dropdown = QComboBox()
+            # NO REORDER:
+            ufunc_dropdown.addItems(["min-max", "bi-piecewise-linear"])
+            # signal for hiding/showing each parameters
+            ufunc_dropdown.currentIndexChanged.connect(self.function_change)
             # add id to the dropdown
-            dropdown.row_id = i
-            horizontalLayout.addWidget(dropdown)
+            ufunc_dropdown.row_id = i
+            ufunc_layout.addWidget(ufunc_dropdown)
             # minmax parameters
-            cb = QtWidgets.QCheckBox()
+            cb = QCheckBox()
             cb.row_id = i
             cb.setText("Invert")
             cb.setChecked(False)
             cb.func_id = 0
-            horizontalLayout.addWidget(cb)
+            ufunc_layout.addWidget(cb)
             # piecewise-linear parameters
             # a
-            a_spinbox = QtWidgets.QSpinBox()
-            a_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+            a_spinbox = QSpinBox()
+            a_slider = QSlider(Qt.Orientation.Horizontal)
             link_spinbox_slider(a_slider, a_spinbox)
             # b
-            b_spinbox = QtWidgets.QSpinBox()
-            b_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+            b_spinbox = QSpinBox()
+            b_slider = QSlider(Qt.Orientation.Horizontal)
             link_spinbox_slider(b_slider, b_spinbox)
             for elto in [a_spinbox, a_slider, b_spinbox, b_slider]:
                 elto.row_id = i
                 elto.func_id = 1
                 elto.setVisible(False)
-                horizontalLayout.addWidget(elto)
+                ufunc_layout.addWidget(elto)
 
-            self.verticalLayout.addLayout(horizontalLayout)
+            self.grid.addLayout(ufunc_layout, i + 1, 3)
             self.rows += [
                 {
                     "i": len(self.rows),
@@ -90,7 +112,8 @@ class MarraquetaDialog(QtWidgets.QDialog):
                     "weight_checkbox": checkbox,
                     "weight_spinbox": spinbox,
                     "weight_slider": slider,
-                    "func_dropdown": dropdown,
+                    "resample_dropdown": resample_dropdown,
+                    "ufunc_dropdown": ufunc_dropdown,
                     "minmax_invert": cb,
                     "a_spinbox": a_spinbox,
                     "a_slider": a_slider,
@@ -98,10 +121,11 @@ class MarraquetaDialog(QtWidgets.QDialog):
                     "b_slider": b_slider,
                 }
             ]
+        self.verticalLayout.addLayout(self.grid)
 
         # add a QtButtonBox to the bottom of the dialog with Ok, and Cancel
-        self.buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Close | QtWidgets.QDialogButtonBox.Reset,
+        self.buttonBox = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Close | QDialogButtonBox.Reset,
         )
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -178,4 +202,4 @@ def link_spinbox_slider_checkbox(spinbox, slider, checkbox):
 
 
 def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="\n", **kwargs):
-    QgsMessageLog.logMessage(sep.join(args) + end, tag, level, **kwargs)
+    QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)

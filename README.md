@@ -60,10 +60,10 @@ https://gdal.org/api/python/raster_api.html#osgeo.gdal.Band.ReadAsArray
     
     resample_alg (int, default = gdal.GRIORA_NearestNeighbour.) -- Specifies the resampling algorithm to use when the size of the read window and the buffer are not equal.
 
-    [ins] In [2]: gdal.GRIORA_Average, gdal.GRIORA_Bilinear, gdal.GRIORA_Cubic, gdal.GRIORA_CubicSpline, gdal.GRIORA_Gauss, gdal.GRIORA_Lanczos, gdal.GRIORA_Mode, gdal.GRIORA_NearestNeighbour, gdal.GRIO
-    Out[2]: (5, 1, 2, 3, 7, 4, 6, 0, 14)
+    [ins] In [5]: gdal.GRIORA_NearestNeighbour, gdal.GRIORA_Bilinear, gdal.GRIORA_Cubic, gdal.GRIORA_CubicSpline, gdal.GRIORA_Lanczos, gdal.GRIORA_Average, gdal.GRIORA_Mode, gdal.GRIORA_Gauss
+    Out[5]: (0, 1, 2, 3, 4, 5, 6, 7)
 
-        Nearest Neighbor (gdal.GRIORA_NearestNeighbour):
+    Nearest Neighbor (gdal.GRIORA_NearestNeighbour):
         This is the default and fastest algorithm.
         It assigns the value of the closest pixel in the original raster to the corresponding pixel in the output array.
         This method can introduce sharp edges and blockiness in the resampled image.
@@ -82,21 +82,22 @@ https://gdal.org/api/python/raster_api.html#osgeo.gdal.Band.ReadAsArray
         This method uses cubic spline interpolation, which is a more advanced technique compared to regular cubic interpolation.
         It offers smoother results but is even more computationally intensive.
 
-    Gauss (gdal.GRIORA_Gauss):
-        This method utilizes a Gaussian distribution to weight the values of neighboring pixels in the original raster.
-        It can be useful for datasets with continuous variation but is less common than other resampling methods.
-
     Lanczos (gdal.GRIORA_Lanczos):
         This method employs a Lanczos filter for interpolation, known for its good preservation of high-frequency details.
         It can be computationally expensive but may be preferred for resampling imagery with sharp edges or fine details.
+
+    Average (gdal.GRIORA_Average):
+        This method calculates the average value of all neighboring pixels in the original raster and assigns it to the output pixel.
+        It can be useful for smoothing noisy data but may blur sharp features.
 
     Mode (gdal.GRIORA_Mode):
         This method assigns the value that appears most frequently among the neighboring pixels in the original raster to the output pixel.
         It can be useful for categorical data but may not be suitable for continuous datasets.
 
-    Average (gdal.GRIORA_Average):
-        This method calculates the average value of all neighboring pixels in the original raster and assigns it to the output pixel.
-        It can be useful for smoothing noisy data but may blur sharp features.
+    Gauss (gdal.GRIORA_Gauss):
+        This method utilizes a Gaussian distribution to weight the values of neighboring pixels in the original raster.
+        It can be useful for datasets with continuous variation but is less common than other resampling methods.
+
 
 https://gdal.org/programs/gdaladdo.html
 

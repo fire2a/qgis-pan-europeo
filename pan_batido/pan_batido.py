@@ -169,19 +169,16 @@ class Marraqueta:
         )
 
         self.mc = self.iface.mapCanvas()
-        self.mc.scaleChanged.connect(self.handle_change)
+        self.mc.scaleChanged.connect(self.handle_scale_change)
 
         # will be set False in run()
         self.first_start = True
 
-    def handle_change(self, x):
-        if iface.activeLayer():
-            extent = iface.mapCanvas().extent()
-            layer = iface.activeLayer()
-            px_size_x = layer.rasterUnitsPerPixelX()
-            px_size_y = layer.rasterUnitsPerPixelY()
-            xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x)
-            ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y)
+    def handle_scale_change(self, x):
+        if layer := self.iface.activeLayer():
+            extent = self.iface.mapCanvas().extent()
+            xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
+            ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
             qprint(f"{xsize=}, {ysize=}")
         qprint(f"zoom scale is {x}")
 
@@ -193,13 +190,13 @@ class Marraqueta:
 
     def run(self):
         """Run method that performs all the real work"""
-        QgsMessageLog.logMessage(f"current layers {self.iface.mapCanvas().layers()}", "Marraqueta", Qgis.Info)
+        qprint("current layers", self.iface.mapCanvas().layers())
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             if len(self.iface.mapCanvas().layers()) == 0:
-                QgsMessageLog.logMessage("No layers loaded. Not loading the dialog!", "Marraqueta", Qgis.Critical)
+                qprint("No layers loaded. Not loading the dialog!", level=Qgis.Critical)
                 # display a message in system toolbar
                 self.iface.messageBar().pushMessage(
                     "No layers loaded",
@@ -216,19 +213,18 @@ class Marraqueta:
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
                 self.lyr_data += [{"layer": layer, "info": info}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
-                QgsMessageLog.logMessage(f"{rimin=} {rimax=}", "Marraqueta", Qgis.Info)
+                qprint(f"{rimin=} {rimax=}")
                 for name in ["a_spinbox", "b_spinbox", "a_slider", "b_slider"]:
                     ret_val = dlg_row[name].setRange(rimin, rimax)
-                    QgsMessageLog.logMessage(f"{name=} {ret_val=}", "Marraqueta", Qgis.Info)
-            QgsMessageLog.logMessage(f"{self.lyr_data=}", "Marraqueta", Qgis.Info)
+                    qprint(f"{name=} {ret_val=}")
+            qprint(f"{self.lyr_data=}")
             self.H = self.lyr_data[0]["info"]["RasterYSize"]
             self.W = self.lyr_data[0]["info"]["RasterXSize"]
             self.GT = self.lyr_data[0]["info"]["Transform"]
             self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
-            QgsMessageLog.logMessage(
-                f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}", "Marraqueta", Qgis.Info
-            )
-            QgsMessageLog.logMessage("not checking if rasters match!", "Marraqueta", Qgis.Warning)
+            self.srs = osr.SpatialReference().ImportFromWkt(self.lyr_data[0]["layer"].crs().toWkt())
+            qprint(f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}, srs:{self.srs}")
+            qprint("not checking if rasters match!", level=Qgis.Warning)
 
         # show the dialog
         self.dlg.show()
@@ -251,9 +247,10 @@ class Marraqueta:
                     weight = dlg_row["weight_spinbox"].value()
                     lyr = self.lyr_data[dlg_row["i"]]
                     lyr_nodata = lyr["info"]["NoDataValue"]
-                    lyr_data, srs = get_sampled_raster_data(lyr["layer"].publicSource(), extent, resolution)
+                    griora = dlg_row["resample_dropdown"].currentIndex()
+                    lyr_data, srs = get_sampled_raster_data(lyr["layer"].publicSource(), extent, resolution, griora)
                     # utility function dropdown current index
-                    ufdci = dlg_row["func_dropdown"].currentIndex()
+                    ufdci = dlg_row["ufunc_dropdown"].currentIndex()
                     if 0 == ufdci:  # min_max_scaling
                         new_data = min_max_scaling(lyr_data, lyr_nodata, invert=dlg_row["minmax_invert"].isChecked())
                         did_any = True
@@ -266,19 +263,17 @@ class Marraqueta:
                             )
                             did_any = True
                         else:
-                            QgsMessageLog.logMessage("a == b, skipping", "Marraqueta", Qgis.Warning)
+                            qprint("a == b, skipping", level=Qgis.Warning)
                             continue
                     else:
-                        QgsMessageLog.logMessage("Unknown utility function", "Marraqueta", Qgis.Critical)
+                        qprint("Unknown utility function", level=Qgis.Critical)
                         return
 
-                    QgsMessageLog.logMessage(
-                        f"{lyr['layer'].name()=} {np.histogram(new_data)=}", "Marraqueta", Qgis.Info
-                    )
+                    qprint(f"{lyr['layer'].name()=} {np.histogram(new_data)=}")
                     final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
 
             if not did_any:
-                QgsMessageLog.logMessage("Nothing to do, all layers unselected or 0 weight", "Marraqueta", Qgis.Info)
+                qprint("Nothing to do, all layers unselected or 0 weight")
                 return
 
             afile = create_sampled_raster(final_data, extent, srs, resolution)
@@ -310,7 +305,7 @@ def bi_piecewise_linear(data, nodata, a, b):
     return np.float32(ret_val)
 
 
-def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080)):
+def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0):
     """Returns the data of the raster in the form of a numpy array, taken from the extent of the map canvas and resampled to resolution
     Args:
         raster_path (str): path to the raster file
@@ -335,9 +330,7 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080)):
         raise ValueError("Could not open raster file")
     srs = osr.SpatialReference()
     if 0 != srs.ImportFromWkt(dataset.GetProjection()):
-        QgsMessageLog.logMessage(
-            "SpatialReference ImportFromWkt failed (using raster without CRS?)", "Marraqueta", Qgis.Critical
-        )
+        qprint(f"SpatialReference ImportFromWkt failed {raster_path=} (maybe raster without CRS?)", level=Qgis.Critical)
     geotransform = dataset.GetGeoTransform()
     # print(f"{srs=}, {geotransform=}")
     band = dataset.GetRasterBand(1)
@@ -350,7 +343,13 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080)):
     ysize = int((extent.yMinimum() - extent.yMaximum()) / geotransform[5])
     # print(f"{xoff=} {yoff=} {xsize=} {ysize=}")
     data = band.ReadAsArray(
-        xoff=xoff, yoff=yoff, win_xsize=xsize, win_ysize=ysize, buf_xsize=resolution[0], buf_ysize=resolution[1]
+        xoff=xoff,
+        yoff=yoff,
+        win_xsize=xsize,
+        win_ysize=ysize,
+        buf_xsize=resolution[0],
+        buf_ysize=resolution[1],
+        resample_alg=griora,
     )
     """
     ret_array = band1.ReadAsArray(
@@ -391,9 +390,9 @@ def create_sampled_raster(data, extent, srs, resolution, *args, **kwargs):
 
     band = dataset.GetRasterBand(1)
     if 0 != band.SetNoDataValue(-9999):
-        QgsMessageLog.logMessage("Set No Data failed", "Marraqueta", Qgis.Critical)
+        qprint("Set No Data failed", level=Qgis.Critical)
     if 0 != band.WriteArray(data):
-        QgsMessageLog.logMessage("WriteArray failed", "Marraqueta", Qgis.Critical)
+        qprint("WriteArray failed", level=Qgis.Critical)
 
     # paint(band)
 
@@ -477,5 +476,5 @@ def current_displayed_pixels(iface):
     return xsize, ysize
 
 
-def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="\n", **kwargs):
-    QgsMessageLog.logMessage(sep.join(args) + end, tag, level, **kwargs)
+def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="", **kwargs):
+    QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)
