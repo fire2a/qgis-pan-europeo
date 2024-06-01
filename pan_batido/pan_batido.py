@@ -317,9 +317,9 @@ def min_max_scaling(data, nodata, invert=False, dtype=None):
     if max_val != min_val:
         ret_val = (data - min_val) / (max_val - min_val)
         if invert:
-            if dtype == uint8:
+            if dtype == np.uint8:
                 return np.uint8(255 - ret_val)
-            elif dtype == uint16:
+            elif dtype == np.uint16:
                 return np.uint16(65535 - ret_val)
             else:
                 return 1 - ret_val

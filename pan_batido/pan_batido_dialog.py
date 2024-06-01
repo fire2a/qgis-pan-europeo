@@ -25,7 +25,7 @@
 
 from functools import partial
 
-from qgis.core import Qgis, QgsRasterLayer
+from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QHBoxLayout,
@@ -227,7 +227,7 @@ class MarraquetaDialog(QDialog):
         row = self.rows[self.sender().row_id]
         # iterate over func_id elements
         for elto in row.values():
-            if isinstance(elto, QgsRasterLayer):
+            if not isinstance(elto, QtWidgets.QWidget):
                 continue
             if hasattr(elto, "func_id"):
                 if elto.func_id == idx:
