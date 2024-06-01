@@ -211,7 +211,7 @@ class Marraqueta:
             self.dlg = MarraquetaDialog()
             self.lyr_data = []
             for dlg_row in self.dlg.rows:
-                layer = dlg_row["layer"]
+                layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
                 self.lyr_data += [{"layer": layer, "info": info}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))

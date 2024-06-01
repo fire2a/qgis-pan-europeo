@@ -25,7 +25,7 @@
 
 from functools import partial
 
-from qgis.core import Qgis
+from qgis.core import Qgis, QgsRasterLayer
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QHBoxLayout,
@@ -131,7 +131,7 @@ class MarraquetaDialog(QDialog):
             self.rows += [
                 {
                     "i": len(self.rows),
-                    "layer": layer,
+                    "layer_id": layer.id(),
                     "weight_checkbox": checkbox,
                     "weight_spinbox": spinbox,
                     "weight_slider": slider,
@@ -227,6 +227,8 @@ class MarraquetaDialog(QDialog):
         row = self.rows[self.sender().row_id]
         # iterate over func_id elements
         for elto in row.values():
+            if isinstance(elto, QgsRasterLayer):
+                continue
             if hasattr(elto, "func_id"):
                 if elto.func_id == idx:
                     elto.setVisible(True)
