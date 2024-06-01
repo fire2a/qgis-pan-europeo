@@ -30,7 +30,7 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QHBoxLayout,
                                  QLabel, QSizePolicy, QSlider, QSpacerItem,
-                                 QSpinBox, QVBoxLayout)
+                                 QSpinBox, QVBoxLayout, QWidget)
 from qgis.utils import iface
 
 from .config import DATATYPES, GRIORAS, qprint
@@ -227,7 +227,7 @@ class MarraquetaDialog(QDialog):
         row = self.rows[self.sender().row_id]
         # iterate over func_id elements
         for elto in row.values():
-            if not isinstance(elto, QtWidgets.QWidget):
+            if not isinstance(elto, QWidget):
                 continue
             if hasattr(elto, "func_id"):
                 if elto.func_id == idx:
