@@ -23,6 +23,7 @@
 """
 import os.path
 import tempfile
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -30,7 +31,8 @@ from fire2a.raster import read_raster
 from osgeo import gdal
 from osgeo.osr import SpatialReference
 from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
-                       QgsCoordinateTransform, QgsProject, QgsRectangle)
+                       QgsCoordinateTransform, QgsProject, QgsRasterLayer,
+                       QgsRectangle)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
@@ -177,12 +179,13 @@ class Marraqueta:
         self.first_start = True
 
     def handle_scale_change(self, x):
+        msg = ""
         if layer := self.iface.activeLayer():
             extent = self.iface.mapCanvas().extent()
             xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
             ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
-            qprint(f"{xsize=}, {ysize=}")
-        qprint(f"zoom scale is {x}")
+            msg += f"{xsize=},\t{ysize=}"
+        qprint(f"zoom scale is {x},\t" + msg)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -213,12 +216,11 @@ class Marraqueta:
             for dlg_row in self.dlg.rows:
                 layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
-                self.lyr_data += [{"layer": layer, "info": info}]
+                self.lyr_data += [{"layer": layer, "info": info, "name": layer.name()}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
-                qprint(f"{rimin=} {rimax=}")
+                qprint(f"{layer.name()=},\t{rimin=},\t{rimax=}")
                 for name in ["a_spinbox", "b_spinbox", "a_slider", "b_slider"]:
-                    ret_val = dlg_row[name].setRange(rimin, rimax)
-                    qprint(f"{name=} {ret_val=}")
+                    dlg_row[name].setRange(rimin, rimax)
             qprint(f"{self.lyr_data=}")
             self.H = self.lyr_data[0]["info"]["RasterYSize"]
             self.W = self.lyr_data[0]["info"]["RasterXSize"]
@@ -232,7 +234,7 @@ class Marraqueta:
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        qprint(f"{result=} {self.dlg.DialogCode()=}")
+        # qprint(f"{result=} {self.dlg.DialogCode()=}")
         # See if OK was pressed
         if result:
             self.dlg.rescale_weights()
@@ -253,6 +255,7 @@ class Marraqueta:
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
                     weight = dlg_row["weight_spinbox"].value()
                     lyr = self.lyr_data[dlg_row["i"]]
+                    lyr_name = lyr["name"]
                     lyr_nodata = lyr["info"]["NoDataValue"]
                     # get data
                     lyr_data, srs = get_sampled_raster_data(
@@ -261,14 +264,18 @@ class Marraqueta:
                         resolution,
                         GRIORAS[dlg_row["resample_dropdown"].currentText()],
                         DATATYPES[data_type]["gdal"],
+                        layer_name=lyr_name,
                     )
+                    # mask nan & nodata
+                    masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data) | (lyr_data == lyr_nodata))
+                    # masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data))
+                    # qprint(f"{masked_data.mask.sum()=}")
                     # utility function dropdown current index
                     ufdci = dlg_row["ufunc_dropdown"].currentIndex()
                     # min_max_scaling
                     if 0 == ufdci:
                         new_data = min_max_scaling(
-                            lyr_data,
-                            lyr_nodata,
+                            masked_data,
                             invert=dlg_row["minmax_invert"].isChecked(),
                             dtype=DATATYPES[data_type]["numpy"],
                         )
@@ -279,11 +286,9 @@ class Marraqueta:
                         b = dlg_row["b_spinbox"].value()
                         if a != b:
                             new_data = bi_piecewise_linear(
-                                lyr_data,
-                                lyr_nodata,
-                                dlg_row["a_spinbox"].value(),
-                                dlg_row["b_spinbox"].value(),
-                                dtype=DATATYPES[data_type]["numpy"],
+                                masked_data,
+                                a,
+                                b,
                             )
                             did_any = True
                         else:
@@ -294,12 +299,16 @@ class Marraqueta:
 
                         raise QgsException(f"Utility function at index:{ufdci} not implemented")
 
-                    qprint(f"{lyr['layer'].name()=} {np.histogram(new_data)=}")
+                    valid = 1 - masked_data.mask.sum() / np.prod(masked_data.shape)
+                    qprint(f"layer: {lyr_name},\tshape:{new_data.shape},\tvalid:{valid:.2%}")
+                    qprint(f"\t result histogram: {np.histogram(new_data,np.arange(0,1.1,0.1))}")
                     final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
 
             if not did_any:
                 qprint("Nothing to do, all layers unselected or 0 weight")
                 return
+
+            final_data[lyr_data == lyr_nodata] = -1
 
             afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
             # name the layer as resolution, pixel size and data type, and HHMMSS
@@ -308,40 +317,35 @@ class Marraqueta:
                 level=Qgis.Success,
             )
             # add the raster layer to the canvas
-            self.iface.addRasterLayer(afile, Path(afile).stem)
+            layer = self.iface.addRasterLayer(afile, Path(afile).stem)
+            if data_type not in ["Byte(0-255)", "UInt16(0-65535)"]:
+                qgis_paint(layer)
 
 
-def min_max_scaling(data, nodata, invert=False, dtype=None):
-    min_val = data[data != nodata].min()
-    max_val = data[data != nodata].max()
-    if max_val != min_val:
-        ret_val = (data - min_val) / (max_val - min_val)
-        if invert:
-            if dtype == np.uint8:
-                return np.uint8(255 - ret_val)
-            elif dtype == np.uint16:
-                return np.uint16(65535 - ret_val)
-            else:
-                return 1 - ret_val
-        return ret_val
-    else:
-        return np.zeros_like(data)
+def min_max_scaling(data, invert=False, dtype=None):
+    if data.min() != data.max():
+        data = (data - data.min()) / (data.max() - data.min())
+    if invert:
+        if dtype == np.uint8:
+            return np.uint8(255 - data)
+        elif dtype == np.uint16:
+            return np.uint16(65535 - data)
+        else:
+            return 1 - data
+    return data
 
 
-def bi_piecewise_linear(data, nodata, a, b, dtype=None):
-    ret_val = np.empty_like(data)
+def bi_piecewise_linear(data, a, b):
     # linear scaling
-    ret_val[data != nodata] = (data[data != nodata] - a) / (b - a)
+    data = (data - a) / (b - a)
     # clip to [0, 1]
     # TODO FIX DATATYPES? uint8, uint16 ?
-    ret_val[ret_val < 0] = 0
-    ret_val[ret_val > 1] = 1
-    # keep nodata values
-    ret_val[data == nodata] = data[data == nodata]
-    return ret_val
+    data[data < 0] = 0
+    data[data > 1] = 1
+    return data
 
 
-def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0, gdt=7, *args, **kwargs):
+def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0, gdt=7, layer_name=""):
     """Returns the data of the raster in the form of a numpy array, taken from the extent of the map canvas and resampled to resolution
     Args:
         raster_path (str): path to the raster file
@@ -362,7 +366,10 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
         extent = iface.mapCanvas().extent()
         resolution = (20, 80)
         resolution = (1920, 1080)
+        griora=0
+        gdt=7
     """
+    qprint(f"{raster_path=}, {extent=}, {resolution=}, {griora=}, {gdt=}, {layer_name=}")
     dataset = gdal.Open(raster_path)
     if dataset is None:
         raise ValueError("Could not open raster file")
@@ -380,17 +387,29 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
     xsize = int((extent.xMaximum() - extent.xMinimum()) / geotransform[1])
     ysize = int((extent.yMinimum() - extent.yMaximum()) / geotransform[5])
     # print(f"{xoff=} {yoff=} {xsize=} {ysize=}")
-    data = band.ReadAsArray(
-        xoff=xoff,
-        yoff=yoff,
-        win_xsize=xsize,
-        win_ysize=ysize,
-        buf_xsize=resolution[0],
-        buf_ysize=resolution[1],
-        resample_alg=griora,
-        buf_type=gdt,
-        callback=progress_callback,
-    )
+    if griora:
+        data = band.ReadAsArray(
+            xoff=xoff,
+            yoff=yoff,
+            win_xsize=xsize,
+            win_ysize=ysize,
+            buf_xsize=resolution[0],
+            buf_ysize=resolution[1],
+            resample_alg=griora,
+            buf_type=gdt,
+            # callback=partial(progress_callback, layer_name=layer_name),
+        )
+    else:
+        data = band.ReadAsArray(
+            xoff=xoff,
+            yoff=yoff,
+            win_xsize=xsize,
+            win_ysize=ysize,
+            buf_xsize=resolution[0],
+            buf_ysize=resolution[1],
+            buf_type=gdt,
+            callback=partial(progress_callback, layer_name=layer_name),
+        )
     """
     ret_array = band1.ReadAsArray(
         xoff=xoff, yoff=yoff, win_xsize=xsize, win_ysize=ysize, buf_xsize=buf_xsize, buf_ysize=buf_ysize, buf_type=gdal.GDT_Float32
@@ -423,12 +442,12 @@ def create_sampled_raster(data, extent, srs, resolution, gdt=7, *args, **kwargs)
     dataset.SetProjection(srs.ExportToWkt())  # export coords to file
 
     band = dataset.GetRasterBand(1)
-    if 0 != band.SetNoDataValue(-9999):
+    if 0 != band.SetNoDataValue(-1):
         qprint("Set No Data failed", level=Qgis.Critical)
     if 0 != band.WriteArray(data):
         qprint("WriteArray failed", level=Qgis.Critical)
 
-    # paint(band)
+    band_paint(band)
 
     dataset.FlushCache()  # write to disk
     dataset = None
@@ -436,7 +455,20 @@ def create_sampled_raster(data, extent, srs, resolution, gdt=7, *args, **kwargs)
     return afile
 
 
-def paint(band: gdal.Band, colormap: str = "turbo") -> None:
+def get_colormap(num_colors: int, colormap: str = "turbo") -> list:
+    from matplotlib import colormaps
+    from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+    from numpy import linspace
+
+    cm = colormaps.get(colormap)
+    if isinstance(cm, LinearSegmentedColormap):
+        colors = cm(linspace(0, 1, num_colors))
+    elif isinstance(cm, ListedColormap):
+        colors = cm.resampled(num_colors).colors
+    return (colors * 255).astype(int)
+
+
+def band_paint(band: gdal.Band) -> None:
     """Paints a gdal raster using band.SetRasterColorTable, only works for Byte and UInt16 bands
     Args:
         band (gdal.Band): band to paint
@@ -451,21 +483,33 @@ def paint(band: gdal.Band, colormap: str = "turbo") -> None:
     else:
         return
 
-    from matplotlib import colormaps
-    from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-    from numpy import linspace
-
-    cm = colormaps.get(colormap)
-    if isinstance(cm, LinearSegmentedColormap):
-        colors = cm(linspace(0, 1, num_colors))
-    elif isinstance(cm, ListedColormap):
-        colors = cm.resampled(num_colors).colors
-    colors = (colors * 255).astype(int)
-
     color_table = gdal.ColorTable()
+    colors = get_colormap(num_colors)
     for i, color in enumerate(colors):
         color_table.SetColorEntry(i, color)
     band.SetRasterColorTable(color_table)
+
+
+def qgis_paint(layer: QgsRasterLayer):
+
+    from PyQt5.QtGui import QColor
+    from qgis.core import (QgsColorRampShader, QgsRasterShader,
+                           QgsSingleBandPseudoColorRenderer)
+
+    num_colors = 10
+    colors = get_colormap(num_colors)
+    fcn = QgsColorRampShader(minimumValue=0, maximumValue=1)
+    fcn.setColorRampType(QgsColorRampShader.Interpolated)
+    fcn.setColorRampItemList([QgsColorRampShader.ColorRampItem(0.1 * i, QColor(*clr)) for i, clr in enumerate(colors)])
+    shader = QgsRasterShader()
+    shader.setRasterShaderFunction(fcn)
+
+    band = layer.bandCount()  # Assuming you want to use the last band
+    renderer = QgsSingleBandPseudoColorRenderer(layer.dataProvider(), band, shader)
+    layer.setRenderer(renderer)
+
+    # Trigger a repaint for the layer
+    layer.triggerRepaint()
 
 
 def get_extent_size(extent: QgsRectangle):
@@ -510,6 +554,7 @@ def current_displayed_pixels(iface):
     return xsize, ysize
 
 
-def progress_callback(pct, message, data, *args, **kwargs):
-    qprint(f"progress_callback {pct=} {message=} {data=} {args=} {kwargs=}")
+def progress_callback(pct, message, data, layer_name=""):
+    # format pct as percetage
+    qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
     return 1  # Return 1 to continue processing, or 0 to cancel
