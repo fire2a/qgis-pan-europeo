@@ -1,7 +1,3 @@
-# This file contains metadata for your plugin.
-
-# This file should be included when you package your plugin.# Mandatory items:
-
 [general]
 name=Pan Europeo
 qgisMinimumVersion=3.34
@@ -9,19 +5,18 @@ description=Ponders very large and distinct rasters with different utility funct
 version=0.0.1
 author=Fernando Badilla Veliz - Fire2a.com
 email=fbadilla@ing.uchile.cl
-
 about=This plugin calculates a raster weighting very large and distinct rasters with different utility functions, for the PanEuropeo project
-
-
 tracker=https://github.com/fire2a/qgis-pan-europeo/issues
 repository=https://github.com/fire2a/qgis-pan-europeo
+
 # End of mandatory metadata
-
 # Recommended items:
-
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=0.0.1 Initial: only happy path implemented! Don't edge case it!
+
+changelog=
+        0.0.2 Handling of nans and nodatas, qgis pseudocolor painting and no resample option
+        0.0.1 Initial: only happy path implemented! Don't edge case it!
 
 # Tags are comma separated with spaces allowed
 tags=python, raster summary, ponderation, multiattribute utility functions
