@@ -486,7 +486,7 @@ def band_paint(band: gdal.Band) -> None:
     color_table = gdal.ColorTable()
     colors = get_colormap(num_colors)
     for i, color in enumerate(colors):
-        color_table.SetColorEntry(i, color)
+        color_table.SetColorEntry(i, tuple(color))
     band.SetRasterColorTable(color_table)
 
 
