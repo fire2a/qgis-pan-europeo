@@ -2,6 +2,19 @@
 """
 breakpoint()
 from IPython import embed
+
+https://fire2a.github.io/qgis-pan-europeo/
+
+https://www.riverbankcomputing.com/static/Docs/PyQt5/
+https://www.riverbankcomputing.com/static/Docs/PyQt5/search.html
+
+https://www.riverbankcomputing.com/static/Docs/PyQt5/api/qtwidgets/qlayout.html
+https://www.riverbankcomputing.com/static/Docs/PyQt5/api/qtwidgets/qabstractitemview.html
+
+https://www.riverbankcomputing.com/static/Docs/PyQt5/api/qtwidgets/qtreewidget.html
+https://www.riverbankcomputing.com/static/Docs/PyQt5/api/qtwidgets/qtreewidgetitem.html
+
+https://www.riverbankcomputing.com/static/Docs/PyQt5/api/qtwidgets/qtreewidgetitemiterator.html
 """
 import sys
 
