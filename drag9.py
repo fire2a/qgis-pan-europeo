@@ -22,9 +22,12 @@ import numpy as np
 from PyQt5.QtCore import QMimeData, Qt
 from PyQt5.QtGui import QDrag
 # from PyQt5.QtWidgets import *
-from PyQt5.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QMainWindow,
-                             QSlider, QSpinBox, QTreeWidget, QTreeWidgetItem,
-                             QWidget)
+from PyQt5.QtWidgets import (QApplication, QComboBox, QDialogButtonBox,
+                             QHBoxLayout, QMainWindow, QPushButton, QSlider,
+                             QSpinBox, QTreeWidget, QTreeWidgetItem,
+                             QTreeWidgetItemIterator, QVBoxLayout, QWidget)
+
+retree = None
 
 
 class ComboBox(QComboBox):
@@ -61,6 +64,13 @@ class SpinBoxSlider(QWidget):
         new.setEnabled(self.isEnabled())
         return new
 
+    def setValue(self, value):
+        self.spinBox.setValue(value)
+        self.slider.setValue(value)
+
+    def value(self):
+        return self.spinBox.value()
+
 
 class LinkedWidget(QWidget):
     def __init__(self):
@@ -96,6 +106,87 @@ class LinkedWidget(QWidget):
                 self.p2.setVisible(True)
 
 
+def cb_close(*args, **kwargs):
+    print("cb Close", args, kwargs)
+
+
+def cb_reset(*args, **kwargs):
+    print("cb Reset", args, kwargs)
+    from IPython.terminal.embed import InteractiveShellEmbed
+
+    InteractiveShellEmbed()()
+
+
+def cb_apply(*args, **kwargs):
+    global retree
+    print("cb Apply", args, kwargs)
+
+    iterator = QTreeWidgetItemIterator(tree)
+    retree = []
+    while iterator.value():
+        item = iterator.value()
+        if not item.parent():
+            parent = {
+                "name": item.text(0),
+                "check": item.checkState(0),
+                "is_enabled": tree.itemWidget(item, 1).isEnabled(),
+                "value": tree.itemWidget(item, 1).value(),
+                "weight_widget": tree.itemWidget(item, 1),
+            }
+            children = []
+            if item.childCount() > 0:
+                for i in range(item.childCount()):
+                    child_item = item.child(i)
+                    weight_widget = tree.itemWidget(child_item, 1)
+                    child = {
+                        "twi": child_item,
+                        "name": child_item.text(0),
+                        "check": child_item.checkState(0),
+                        "is_enabled": weight_widget.isEnabled(),
+                        "value": weight_widget.value(),
+                        "weight_widget": weight_widget,
+                    }
+                    children.append(child)
+            parent["children"] = children
+            retree += [parent]
+        iterator += 1
+
+    parent_sum = sum([parent["check"] / 2 * parent["value"] for parent in retree])
+    for parent in retree:
+        parent_adj_val = parent["check"] / 2 * parent["value"] / (parent_sum if parent_sum != 0 else 1)
+        print(
+            f"PARENT\t{parent['name']}\t{parent['check']}\t{parent['is_enabled']}\t{parent['value']:.3f}\t{parent_adj_val:.3f}"
+        )
+        parent["adj_val"] = parent_adj_val
+        child_sum = sum([child["check"] / 2 * child["value"] for child in parent["children"]])
+        for child in parent["children"]:
+            child_adj_val = child["check"] / 2 * child["value"] / (child_sum if child_sum != 0 else 1)
+            child["adj_val"] = child_adj_val
+            print(
+                f"CHILD\t{child['name']}\t{child['check']}\t{child['is_enabled']}\t{child['value']:.3f}\t{child_adj_val:.3f}\t{parent_adj_val*child_adj_val:.3f}"
+            )
+            # print float with 2 decimals
+            # print(f"{parent_adj_val*child_adj_val:.2f}")
+
+
+def cb_ok(*args, **kwargs):
+    global retree
+    print("cb Ok", args, kwargs)
+
+    for parent in retree:
+        if parent["is_enabled"]:
+            parent["weight_widget"].setValue(int(parent["adj_val"] * 100))
+        for child in parent["children"]:
+            if child["is_enabled"]:
+                child["weight_widget"].setValue(int(child["adj_val"] * 100))
+
+
+def has_parent(item):
+    if item.parent():
+        return True
+    return False
+
+
 class TreeWidget(QTreeWidget):
     def __init__(self, instance, column_count=3, header_labels=["Name", "Weight", "Option"]):
         super().__init__()
@@ -127,28 +218,24 @@ class TreeWidget(QTreeWidget):
         self.expandAll()
 
     def item_changed(self, item):
+        # enable/disable same row widgets according to item check state
         for i in range(self.columnCount() - 1):
-            widget = self.itemWidget(item, i + 1)
-            if widget:
+            if widget := self.itemWidget(item, i + 1):
                 widget.setEnabled(item.checkState(0) == Qt.Checked)
-        # item is top level
-        if item.parent() is None:
+        if parent := item.parent():
+            # if checking a child, check parent
+            if item.checkState(0) == Qt.Checked:
+                parent.setCheckState(0, Qt.Checked)
+        else:
+            # expand/fold children
             if item.checkState(0) == Qt.Checked:
                 item.setExpanded(True)
             else:
                 item.setExpanded(False)
-
-        """
-        # iterate over all rows in the tree
-        for i in range(self.topLevelItemCount()):
-            parent = self.topLevelItem(i)
-            for j in range(parent.childCount()):
-                child = parent.child(j)
-                if child.checkState(0) == Qt.Checked:
-                    child.setExpanded(True)
-                else:
-                    child.setExpanded(False)
-        """
+                # fold => uncheck children
+                for j in range(item.childCount()):
+                    child = item.child(j)
+                    child.setCheckState(0, Qt.Unchecked)
 
     def startDrag(self, supportedActions):
         item = self.currentItem()
@@ -224,7 +311,29 @@ if __name__ == "__main__":
 
     tree = TreeWidget(instance, column_count=4, header_labels=["Name", "Weight", "Option", "Linked"])
 
-    main_window.setCentralWidget(tree)
+    btn = QPushButton("Adjust Weights")
+    buttonBox = QDialogButtonBox(
+        QDialogButtonBox.Ok | QDialogButtonBox.Close | QDialogButtonBox.Reset | QDialogButtonBox.Apply,
+    )
+    buttonBox.addButton(btn, QDialogButtonBox.ActionRole)
+    buttonBox.accepted.connect(cb_ok)
+    buttonBox.rejected.connect(cb_close)
+    for bbb in buttonBox.buttons():
+        match bbb.text():
+            case "Reset":
+                print("reset")
+                bbb.clicked.connect(cb_reset)
+            case "Apply":
+                print("apply")
+                bbb.clicked.connect(cb_apply)
+
+    vlayout = QVBoxLayout()
+    vlayout.addWidget(tree)
+    vlayout.addWidget(buttonBox)
+    central_widget = QWidget()
+    central_widget.setLayout(vlayout)
+
+    main_window.setCentralWidget(central_widget)
     main_window.resize(800, 600)  # Manually set the size of the main window (width, height)
     # main_window.adjustSize()  # Adjust the main window size to fit its contents
     main_window.show()
