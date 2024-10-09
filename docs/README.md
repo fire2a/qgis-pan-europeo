@@ -42,7 +42,7 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
 2. Load a set of raster layers
 3. Click on the "Pan European Proof of Concept" plugin icon
 4. Configure for each layer/row (see details [below](#raster-configuration))
-5. (TODO) Configure target resolution (optional)
+5. Configure target raster creation (optional)
 6. Buttons: 
 ```
 Reset: to clear the dialog, load another set of layers
@@ -57,8 +57,15 @@ For each available layer (must be local and written to disk) available configura
 2. Weight attributes as spinbox & slider (they get adjusted to sum 100 at run time)
 3. Resample method combobox selector (see details [below](#resampling-methods))
 4. Utility function configuration, select between:  
-   a. Min-Max scaling, with a invert values checkbox  
-   b. Bi-Piecewise-Linear, with its two breakpoint setup as spinbox & slider (inverts when the second is lower than the first)  
+   a. Min-Max scaling
+   b. Max-Min scaling, same but inverted
+   c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values
+   d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)
+5. Target raster creation setup:
+   - By default setup to create a "HD (1920x1080 pixels) image with each pixel representing an hectare (100x100m) pixel size" to speed up the processing
+   - Except when the zoom level is so high that the shown data is smaller than HD. In that case, the target raster will have the same resolution as the original raster in the actual viewport
+   - Currently the algorithm will get confused if the shown raster is not in a squared meters projection CRS
+   - Currently the datatype configuration is untested
 
 ### Resampling methods
 Each target raster is expected to have billion pixels and the resampling method is crucial to the final result in a reasonable time. The following methods are available:
