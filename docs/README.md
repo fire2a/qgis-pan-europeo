@@ -57,10 +57,10 @@ For each available layer (must be local and written to disk) available configura
 2. Weight attributes as spinbox & slider (they get adjusted to sum 100 at run time)
 3. Resample method combobox selector (see details [below](#resampling-methods))
 4. Utility function configuration, select between:  
-   a. Min-Max scaling
-   b. Max-Min scaling, same but inverted
-   c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values
-   d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)
+   a. Min-Max scaling  
+   b. Max-Min scaling, same but inverted  
+   c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values  
+   d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)  
 5. Target raster creation setup:
    - By default setup to create a "HD (1920x1080 pixels) image with each pixel representing an hectare (100x100m) pixel size" to speed up the processing
    - Except when the zoom level is so high that the shown data is smaller than HD. In that case, the target raster will have the same resolution as the original raster in the actual viewport
