@@ -286,19 +286,33 @@ class Marraqueta:
                             dtype=DATATYPES[data_type]["numpy"],
                         )
                         did_any = True
-                    # bi_piecewise_linear
+                    # bi_piecewise_linear_values
                     elif 2 == ufdci:
                         a = dlg_row["a_spinbox"].value()
                         b = dlg_row["b_spinbox"].value()
                         if a != b:
-                            new_data = bi_piecewise_linear(
+                            new_data = bi_piecewise_linear_values(
                                 masked_data,
                                 a,
                                 b,
                             )
                             did_any = True
                         else:
-                            qprint("a == b, skipping", level=Qgis.Warning)
+                            qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
+                            continue
+                    # bi_piecewise_linear_percentage
+                    elif 3 == ufdci:
+                        c = dlg_row["c_spinbox"].value()
+                        d = dlg_row["d_spinbox"].value()
+                        if c != d:
+                            new_data = bi_piecewise_linear_percentage(
+                                masked_data,
+                                c,
+                                d,
+                            )
+                            did_any = True
+                        else:
+                            qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
                             continue
                     else:
                         from qgis.core import QgsException
@@ -348,9 +362,22 @@ def max_min_scaling(data, dtype=None):
     return data
 
 
-def bi_piecewise_linear(data, a, b):
+def bi_piecewise_linear_values(data, a, b):
     # linear scaling
     data = (data - a) / (b - a)
+    # clip to [0, 1]
+    # TODO FIX DATATYPES? uint8, uint16 ?
+    data[data < 0] = 0
+    data[data > 1] = 1
+    return data
+
+
+def bi_piecewise_linear_percentage(data, a, b):
+    # linear scaling
+    rela_delta = data.max() - data.min() / 100
+    real_a = rela_delta * a
+    real_b = rela_delta * b
+    data = (data - real_a) / (real_b - real_a)
     # clip to [0, 1]
     # TODO FIX DATATYPES? uint8, uint16 ?
     data[data < 0] = 0

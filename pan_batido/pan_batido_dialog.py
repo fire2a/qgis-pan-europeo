@@ -84,7 +84,9 @@ class MarraquetaDialog(QDialog):
             ufunc_layout = QHBoxLayout()
             ufunc_dropdown = QComboBox()
             # NO REORDER:
-            ufunc_dropdown.addItems(["min-max", "max-min", "bi-piecewise-linear values"])
+            ufunc_dropdown.addItems(
+                ["min-max", "max-min", "bi-piecewise-linear values", "bi-piecewise-linear percentage"]
+            )
             # signal for hiding/showing each parameters
             ufunc_dropdown.currentIndexChanged.connect(self.function_change)
             # add id to the dropdown
@@ -100,6 +102,7 @@ class MarraquetaDialog(QDialog):
             lbl2.func_id = 1
             lbl2.row_id = i
             ufunc_layout.addWidget(lbl2)
+
             # piecewise-linear parameters
             # a
             a_spinbox = QSpinBox()
@@ -115,6 +118,21 @@ class MarraquetaDialog(QDialog):
                 elto.setVisible(False)
                 ufunc_layout.addWidget(elto)
 
+            # piecewise-linear parameters
+            # c
+            c_spinbox = QSpinBox()
+            c_slider = QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(c_slider, c_spinbox)
+            # d
+            d_spinbox = QSpinBox()
+            d_slider = QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(d_slider, d_spinbox)
+            for elto in [c_spinbox, c_slider, d_spinbox, d_slider]:
+                elto.row_id = i
+                elto.func_id = 3
+                elto.setVisible(False)
+                ufunc_layout.addWidget(elto)
+
             checkbox.setChecked(True)
             checkbox.stateChanged.connect(
                 partial(
@@ -127,6 +145,10 @@ class MarraquetaDialog(QDialog):
                     a_slider,
                     b_spinbox,
                     b_slider,
+                    c_spinbox,
+                    c_slider,
+                    d_spinbox,
+                    d_slider,
                 )
             )
 
@@ -144,6 +166,10 @@ class MarraquetaDialog(QDialog):
                     "a_slider": a_slider,
                     "b_spinbox": b_spinbox,
                     "b_slider": b_slider,
+                    "c_spinbox": c_spinbox,
+                    "c_slider": c_slider,
+                    "d_spinbox": d_spinbox,
+                    "d_slider": d_slider,
                 }
             ]
         self.input_groupbox.setLayout(self.grid)
