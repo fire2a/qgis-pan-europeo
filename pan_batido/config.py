@@ -5,6 +5,7 @@ from osgeo.gdal import (GDT_Byte, GDT_Float32, GDT_Float64, GDT_UInt16,
                         GRIORA_CubicSpline, GRIORA_Gauss, GRIORA_Lanczos,
                         GRIORA_Mode, GRIORA_NearestNeighbour)
 from qgis.core import Qgis, QgsMessageLog
+from qgis.PyQt.QtCore import QCoreApplication
 
 DATATYPES = {
     "Byte(0-255)": {"gdal": GDT_Byte, "numpy": uint8},
@@ -22,8 +23,10 @@ GRIORAS = {
     "Average": GRIORA_Average,
     "Mode": GRIORA_Mode,
     "Gauss blurring": GRIORA_Gauss,
+    "None": None,
 }
 
 
-def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="\n", **kwargs):
+def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="", **kwargs):
     QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)
+    QCoreApplication.processEvents()
