@@ -276,12 +276,18 @@ class Marraqueta:
                     if 0 == ufdci:
                         new_data = min_max_scaling(
                             masked_data,
-                            invert=dlg_row["minmax_invert"].isChecked(),
+                            dtype=DATATYPES[data_type]["numpy"],
+                        )
+                        did_any = True
+                    # max_min_scaling
+                    elif 1 == ufdci:
+                        new_data = max_min_scaling(
+                            masked_data,
                             dtype=DATATYPES[data_type]["numpy"],
                         )
                         did_any = True
                     # bi_piecewise_linear
-                    elif 1 == ufdci:
+                    elif 2 == ufdci:
                         a = dlg_row["a_spinbox"].value()
                         b = dlg_row["b_spinbox"].value()
                         if a != b:
@@ -322,16 +328,23 @@ class Marraqueta:
                 qgis_paint(layer)
 
 
-def min_max_scaling(data, invert=False, dtype=None):
+def min_max_scaling(data, dtype=None):
     if data.min() != data.max():
         data = (data - data.min()) / (data.max() - data.min())
-    if invert:
-        if dtype == np.uint8:
-            return np.uint8(255 - data)
-        elif dtype == np.uint16:
-            return np.uint16(65535 - data)
-        else:
-            return 1 - data
+    if dtype == np.uint8:
+        return np.uint8(255 * data)
+    elif dtype == np.uint16:
+        return np.uint16(65535 * data)
+    return data
+
+
+def max_min_scaling(data, dtype=None):
+    if data.min() != data.max():
+        data = (data - data.max()) / (data.max() - data.min())
+    if dtype == np.uint8:
+        return np.uint8(255 * data)
+    elif dtype == np.uint16:
+        return np.uint16(65535 * data)
     return data
 
 

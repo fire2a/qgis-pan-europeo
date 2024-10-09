@@ -84,19 +84,22 @@ class MarraquetaDialog(QDialog):
             ufunc_layout = QHBoxLayout()
             ufunc_dropdown = QComboBox()
             # NO REORDER:
-            ufunc_dropdown.addItems(["min-max", "bi-piecewise-linear"])
+            ufunc_dropdown.addItems(["min-max", "max-min", "bi-piecewise-linear values"])
             # signal for hiding/showing each parameters
             ufunc_dropdown.currentIndexChanged.connect(self.function_change)
             # add id to the dropdown
             ufunc_dropdown.row_id = i
             ufunc_layout.addWidget(ufunc_dropdown)
             # minmax parameters
-            cb = QCheckBox()
-            cb.row_id = i
-            cb.setText("Invert")
-            cb.setChecked(False)
-            cb.func_id = 0
-            ufunc_layout.addWidget(cb)
+            lbl1 = QLabel("")
+            lbl1.func_id = 0
+            lbl1.row_id = i
+            ufunc_layout.addWidget(lbl1)
+            # maxmin parameters
+            lbl2 = QLabel("")
+            lbl2.func_id = 1
+            lbl2.row_id = i
+            ufunc_layout.addWidget(lbl2)
             # piecewise-linear parameters
             # a
             a_spinbox = QSpinBox()
@@ -108,7 +111,7 @@ class MarraquetaDialog(QDialog):
             link_spinbox_slider(b_slider, b_spinbox)
             for elto in [a_spinbox, a_slider, b_spinbox, b_slider]:
                 elto.row_id = i
-                elto.func_id = 1
+                elto.func_id = 2
                 elto.setVisible(False)
                 ufunc_layout.addWidget(elto)
 
@@ -120,7 +123,6 @@ class MarraquetaDialog(QDialog):
                     slider,
                     resample_dropdown,
                     ufunc_dropdown,
-                    cb,
                     a_spinbox,
                     a_slider,
                     b_spinbox,
@@ -138,7 +140,6 @@ class MarraquetaDialog(QDialog):
                     "weight_slider": slider,
                     "resample_dropdown": resample_dropdown,
                     "ufunc_dropdown": ufunc_dropdown,
-                    "minmax_invert": cb,
                     "a_spinbox": a_spinbox,
                     "a_slider": a_slider,
                     "b_spinbox": b_spinbox,
