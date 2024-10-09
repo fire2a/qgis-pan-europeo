@@ -236,7 +236,7 @@ class Marraqueta:
         result = self.dlg.exec_()
         # qprint(f"{result=} {self.dlg.DialogCode()=}")
         # See if OK was pressed
-        if result:
+        if result == 1:
             self.dlg.rescale_weights()
 
             extent = self.iface.mapCanvas().extent()
