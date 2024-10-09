@@ -276,23 +276,43 @@ class Marraqueta:
                     if 0 == ufdci:
                         new_data = min_max_scaling(
                             masked_data,
-                            invert=dlg_row["minmax_invert"].isChecked(),
                             dtype=DATATYPES[data_type]["numpy"],
                         )
                         did_any = True
-                    # bi_piecewise_linear
+                    # max_min_scaling
                     elif 1 == ufdci:
+                        new_data = max_min_scaling(
+                            masked_data,
+                            dtype=DATATYPES[data_type]["numpy"],
+                        )
+                        did_any = True
+                    # bi_piecewise_linear_values
+                    elif 2 == ufdci:
                         a = dlg_row["a_spinbox"].value()
                         b = dlg_row["b_spinbox"].value()
                         if a != b:
-                            new_data = bi_piecewise_linear(
+                            new_data = bi_piecewise_linear_values(
                                 masked_data,
                                 a,
                                 b,
                             )
                             did_any = True
                         else:
-                            qprint("a == b, skipping", level=Qgis.Warning)
+                            qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
+                            continue
+                    # bi_piecewise_linear_percentage
+                    elif 3 == ufdci:
+                        c = dlg_row["c_spinbox"].value()
+                        d = dlg_row["d_spinbox"].value()
+                        if c != d:
+                            new_data = bi_piecewise_linear_percentage(
+                                masked_data,
+                                c,
+                                d,
+                            )
+                            did_any = True
+                        else:
+                            qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
                             continue
                     else:
                         from qgis.core import QgsException
@@ -322,22 +342,42 @@ class Marraqueta:
                 qgis_paint(layer)
 
 
-def min_max_scaling(data, invert=False, dtype=None):
+def min_max_scaling(data, dtype=None):
     if data.min() != data.max():
         data = (data - data.min()) / (data.max() - data.min())
-    if invert:
-        if dtype == np.uint8:
-            return np.uint8(255 - data)
-        elif dtype == np.uint16:
-            return np.uint16(65535 - data)
-        else:
-            return 1 - data
+    if dtype == np.uint8:
+        return np.uint8(255 * data)
+    elif dtype == np.uint16:
+        return np.uint16(65535 * data)
     return data
 
 
-def bi_piecewise_linear(data, a, b):
+def max_min_scaling(data, dtype=None):
+    if data.min() != data.max():
+        data = (data - data.max()) / (data.max() - data.min())
+    if dtype == np.uint8:
+        return np.uint8(255 * data)
+    elif dtype == np.uint16:
+        return np.uint16(65535 * data)
+    return data
+
+
+def bi_piecewise_linear_values(data, a, b):
     # linear scaling
     data = (data - a) / (b - a)
+    # clip to [0, 1]
+    # TODO FIX DATATYPES? uint8, uint16 ?
+    data[data < 0] = 0
+    data[data > 1] = 1
+    return data
+
+
+def bi_piecewise_linear_percentage(data, a, b):
+    # linear scaling
+    rela_delta = data.max() - data.min() / 100
+    real_a = rela_delta * a
+    real_b = rela_delta * b
+    data = (data - real_a) / (real_b - real_a)
     # clip to [0, 1]
     # TODO FIX DATATYPES? uint8, uint16 ?
     data[data < 0] = 0
