@@ -27,7 +27,7 @@ from functools import partial
 
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
+from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog, QGroupBox,
                                  QDialogButtonBox, QGridLayout, QHBoxLayout,
                                  QLabel, QSizePolicy, QSlider, QSpacerItem,
                                  QSpinBox, QVBoxLayout, QWidget)
@@ -47,8 +47,9 @@ class MarraquetaDialog(QDialog):
         self.setLayout(self.verticalLayout)
 
         # each row is a name | weight | resample | utility function
+        self.input_groupbox = QGroupBox('Input rasters')
         self.grid = QGridLayout()
-        self.grid.addWidget(QLabel("raster"), 0, 0)
+        self.grid.addWidget(QLabel("name"), 0, 0)
         self.grid.addWidget(QLabel("weight"), 0, 1)
         self.grid.addWidget(QLabel("resample/interpolation algo."), 0, 2)
         self.grid.addWidget(QLabel("utility func."), 0, 3)
@@ -144,33 +145,36 @@ class MarraquetaDialog(QDialog):
                     "b_slider": b_slider,
                 }
             ]
-        self.verticalLayout.addLayout(self.grid)
+        self.input_groupbox.setLayout(self.grid)
+        self.verticalLayout.addWidget(self.input_groupbox)
 
         self.verticalLayout.addItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         # target resolution x,y; pixel size, data type
-        self.target_layout = QHBoxLayout()
-        self.target_layout.addWidget(QLabel("target resolution width[px]:"))
+        self.target_groupbox = QGroupBox('Output configuration')
+        self.target_layout = QGridLayout()
+        self.target_layout.addWidget(QLabel("width [px]:"), 0, 0)
         self.resolution_x = QSpinBox()
         self.resolution_x.setRange(1, 2147483647)
         self.resolution_x.setValue(1920)
-        self.target_layout.addWidget(self.resolution_x)
-        self.target_layout.addWidget(QLabel("height[px]:"))
+        self.target_layout.addWidget(self.resolution_x, 0, 1)
+        self.target_layout.addWidget(QLabel("height [px]:"), 1, 0)
         self.resolution_y = QSpinBox()
         self.resolution_y.setRange(1, 2147483647)
         self.resolution_y.setValue(1080)
-        self.target_layout.addWidget(self.resolution_y)
-        self.target_layout.addWidget(QLabel("pixel size[m]:"))
+        self.target_layout.addWidget(self.resolution_y, 1, 1)
+        self.target_layout.addWidget(QLabel("pixel size [m]:"), 0, 2)
         self.pixel_size = QSpinBox()
         self.pixel_size.setRange(1, 2147483647)
         self.pixel_size.setValue(100)
-        self.target_layout.addWidget(self.pixel_size)
-        self.target_layout.addWidget(QLabel("data type:"))
+        self.target_layout.addWidget(self.pixel_size, 0, 3)
+        self.target_layout.addWidget(QLabel("data type:"), 1, 2)
         self.data_type = QComboBox()
         self.data_type.addItems(list(DATATYPES.keys()))
         self.data_type.setCurrentIndex(2)
-        self.target_layout.addWidget(self.data_type)
-        self.verticalLayout.addLayout(self.target_layout)
+        self.target_layout.addWidget(self.data_type, 1, 3)
+        self.target_groupbox.setLayout(self.target_layout)
+        self.verticalLayout.addWidget(self.target_groupbox)
 
         # add a QtButtonBox to the bottom of the dialog with Ok, and Cancel
         self.buttonBox = QDialogButtonBox(
