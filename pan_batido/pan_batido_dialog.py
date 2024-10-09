@@ -27,10 +27,10 @@ from functools import partial
 
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog, QGroupBox,
-                                 QDialogButtonBox, QGridLayout, QHBoxLayout,
-                                 QLabel, QSizePolicy, QSlider, QSpacerItem,
-                                 QSpinBox, QVBoxLayout, QWidget)
+from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
+                                 QDialogButtonBox, QGridLayout, QGroupBox,
+                                 QHBoxLayout, QLabel, QSizePolicy, QSlider,
+                                 QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
 from qgis.utils import iface
 
 from .config import DATATYPES, GRIORAS, qprint
@@ -47,7 +47,7 @@ class MarraquetaDialog(QDialog):
         self.setLayout(self.verticalLayout)
 
         # each row is a name | weight | resample | utility function
-        self.input_groupbox = QGroupBox('Input rasters')
+        self.input_groupbox = QGroupBox("Input rasters")
         self.grid = QGridLayout()
         self.grid.addWidget(QLabel("name"), 0, 0)
         self.grid.addWidget(QLabel("weight"), 0, 1)
@@ -151,7 +151,7 @@ class MarraquetaDialog(QDialog):
         self.verticalLayout.addItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         # target resolution x,y; pixel size, data type
-        self.target_groupbox = QGroupBox('Output configuration')
+        self.target_groupbox = QGroupBox("Output configuration")
         self.target_layout = QGridLayout()
         self.target_layout.addWidget(QLabel("width [px]:"), 0, 0)
         self.resolution_x = QSpinBox()
