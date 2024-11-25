@@ -238,18 +238,33 @@ class Marraqueta:
         # See if OK was pressed
         if result == 1:
             self.dlg.rescale_weights()
-
             extent = self.iface.mapCanvas().extent()
-            qprint(f"{extent=}")
-            ppta_x = self.dlg.resolution_x.value()
-            ppta_y = self.dlg.resolution_y.value()
-            px_size = self.dlg.pixel_size.value()
-            data_type = self.dlg.data_type.currentText()
-            qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
-            resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
-            qprint(f"{resolution=}")
+            # qprint(f"{extent=}")
 
+            # resolution calculation
+            # try the user input, else the first layer
+            if self.dlg.advanced_checkbox.isChecked():
+                ppta_x = self.dlg.resolution_x.value()
+                ppta_y = self.dlg.resolution_y.value()
+                px_size = self.dlg.pixel_size.value()
+                qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
+                resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
+                qprint(f"Advanced options, got {resolution=} (from user input unless current extent is smaller)")
+            else:
+                lyr_dic = self.dlg.rows[0]
+                lyr = self.iface.mapCanvas().layer(lyr_dic["layer_id"])
+                resx = round(extent.width() / lyr.rasterUnitsPerPixelX())
+                resy = round(extent.height() / lyr.rasterUnitsPerPixelY())
+                resolution = (resx, resy)
+                qprint(f"Basic options: got {resolution=} from first layer")
+
+            # TODO variable datatypes
+            data_type = self.dlg.data_type.currentText()
+
+            # here we will store the final data
             final_data = np.zeros(resolution[::-1], dtype=DATATYPES[data_type]["numpy"])
+
+            #
             did_any = False
             for dlg_row in self.dlg.rows:
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
@@ -333,7 +348,7 @@ class Marraqueta:
             afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
             # name the layer as resolution, pixel size and data type, and HHMMSS
             qprint(
-                f"Created {afile=}, {resolution=}, {px_size=}, {data_type=}",
+                f"Created {afile=}, {resolution=}, {data_type=}",
                 level=Qgis.Success,
             )
             # add the raster layer to the canvas
