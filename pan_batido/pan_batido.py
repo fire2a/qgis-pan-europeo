@@ -172,20 +172,20 @@ class Marraqueta:
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )
 
-        self.mc = self.iface.mapCanvas()
-        self.mc.scaleChanged.connect(self.handle_scale_change)
+        # self.mc = self.iface.mapCanvas()
+        # self.mc.scaleChanged.connect(self.handle_scale_change)
 
         # will be set False in run()
         self.first_start = True
 
-    def handle_scale_change(self, x):
-        msg = ""
-        if layer := self.iface.activeLayer():
-            extent = self.iface.mapCanvas().extent()
-            xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
-            ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
-            msg += f"{xsize=},\t{ysize=}"
-        qprint(f"zoom scale is {x},\t" + msg)
+    # def handle_scale_change(self, x):
+    #     msg = ""
+    #     if layer := self.iface.activeLayer():
+    #         extent = self.iface.mapCanvas().extent()
+    #         xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
+    #         ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
+    #         msg += f"{xsize=},\t{ysize=}"
+    #     qprint(f"zoom scale is {x},\t" + msg)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
