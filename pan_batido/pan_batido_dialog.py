@@ -237,7 +237,7 @@ class MarraquetaDialog(QDialog):
         self.verticalLayout.addLayout(hl)
 
         self.verticalLayout.addWidget(self.buttonBox)
-        # self.setupUi(self)
+        # self.setupUi(self) not using QtDesigner
 
     def reject(self):
         self.destroy()
