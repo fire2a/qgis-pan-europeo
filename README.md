@@ -18,6 +18,7 @@ A. Each row belonging to a layer, containing
 - utility function configuration x2:
 -- Min-Max scaling, with a invert checkbox
 -- Bi-Piecewise-Linear, with spinboxes&sliders for its two 2 points (where the range are the raster min-max values)
+-- Step function, with spinboxes&sliders for the threshold point
   
 B. A Toolbox with standard buttons (Ok, Cancel, Reset)
 
