@@ -219,8 +219,11 @@ class Marraqueta:
                 self.lyr_data += [{"layer": layer, "info": info, "name": layer.name()}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
                 qprint(f"{layer.name()=},\t{rimin=},\t{rimax=}")
-                for name in ["a_spinbox", "b_spinbox", "a_slider", "b_slider"]:
-                    dlg_row[name].setRange(rimin, rimax)
+                # set ranges for utility functions
+                for letters in ["a", "b", "e", "g"]:
+                    for wid in ["spinbox", "slider"]:
+                        name = f"{letters}_{wid}"
+                        dlg_row[name].setRange(rimin, rimax)
             qprint(f"{self.lyr_data=}")
             self.H = self.lyr_data[0]["info"]["RasterYSize"]
             self.W = self.lyr_data[0]["info"]["RasterXSize"]
@@ -329,6 +332,22 @@ class Marraqueta:
                         else:
                             qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
                             continue
+                    elif 4 == ufdci:
+                        e = dlg_row["e_spinbox"].value()
+                        new_data = step_up_function_values(masked_data, e)
+                        did_any = True
+                    elif 5 == ufdci:
+                        f = dlg_row["f_spinbox"].value()
+                        new_data = step_up_function_percentage(masked_data, f)
+                        did_any = True
+                    elif 6 == ufdci:
+                        g = dlg_row["g_spinbox"].value()
+                        new_data = step_down_function_percentage(masked_data, g)
+                        did_any = True
+                    elif 7 == ufdci:
+                        h = dlg_row["h_spinbox"].value()
+                        new_data = step_down_function_percentage(masked_data, h)
+                        did_any = True
                     else:
                         from qgis.core import QgsException
 
@@ -397,6 +416,34 @@ def bi_piecewise_linear_percentage(data, a, b):
     # TODO FIX DATATYPES? uint8, uint16 ?
     data[data < 0] = 0
     data[data > 1] = 1
+    return data
+
+
+def step_up_function_values(data, a):
+    data[data < a] = 0
+    data[data >= a] = 1
+    return data
+
+
+def step_up_function_percentage(data, a):
+    rela_delta = data.max() - data.min() / 100
+    real_a = rela_delta * a
+    data[data < real_a] = 0
+    data[data >= real_a] = 1
+    return data
+
+
+def step_down_function_values(data, a):
+    data[data > a] = 0
+    data[data <= a] = 1
+    return data
+
+
+def step_down_function_percentage(data, a):
+    rela_delta = data.max() - data.min() / 100
+    real_a = rela_delta * a
+    data[data > real_a] = 0
+    data[data <= real_a] = 1
     return data
 
 
