@@ -51,7 +51,8 @@ class MarraquetaDialog(QDialog):
         self.grid = QGridLayout()
         self.grid.addWidget(QLabel("name"), 0, 0)
         self.grid.addWidget(QLabel("weight"), 0, 1)
-        self.grid.addWidget(QLabel("resample/interpolation algo."), 0, 2)
+        self.resample_title = QLabel("resample/interpolation algo.")
+        self.grid.addWidget(self.resample_title, 0, 2)
         self.grid.addWidget(QLabel("utility func."), 0, 3)
 
         # for each layer a row of controls
@@ -219,6 +220,15 @@ class MarraquetaDialog(QDialog):
         label.setOpenExternalLinks(True)
         label.setAlignment(Qt.AlignLeft)
         hl.addWidget(label)
+
+        self.advanced_checkbox = QCheckBox("Advanced options")
+        self.target_groupbox.hide()
+        self.resample_title.hide()
+        for r in self.rows:
+            r["resample_dropdown"].hide()
+        self.advanced_checkbox.stateChanged.connect(self.handle_advanced_toggle)
+        hl.addWidget(self.advanced_checkbox)
+
         label = QLabel()
         label.setText('<a href="https://github.com/fire2a/qgis-pan-europeo/issues">issues</a>')
         label.setOpenExternalLinks(True)
@@ -265,6 +275,19 @@ class MarraquetaDialog(QDialog):
                     elto.setVisible(True)
                 else:
                     elto.setVisible(False)
+
+    def handle_advanced_toggle(self):
+        """show/hide advanced options"""
+        if self.advanced_checkbox.isChecked():
+            self.target_groupbox.show()
+            self.resample_title.show()
+            for r in self.rows:
+                r["resample_dropdown"].show()
+        else:
+            self.target_groupbox.hide()
+            self.resample_title.hide()
+            for r in self.rows:
+                r["resample_dropdown"].hide()
 
 
 def link_spinbox_slider(slider, spinbox):
