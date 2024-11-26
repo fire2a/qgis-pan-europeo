@@ -47,3 +47,13 @@ ax[2].set_xticks([0.25, 0.75])
 ax[2].set_xticklabels(["a", "b"])
 
 plt.show()
+
+del fig
+
+fig, ax = plt.subplots()
+x = np.linspace(0, 1, 100)
+y = np.piecewise(x, [x < 0.75, x >= 0.75], [lambda x: x / 0.75, 1])
+ax.plot(x, y, label="bi-piecewise-linear a=0 & b")
+ax.set_xticks([0, 0.75])
+ax.set_xticklabels(["a=0", "b"])
+plt.show()
