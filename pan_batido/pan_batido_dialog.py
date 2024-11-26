@@ -51,7 +51,8 @@ class MarraquetaDialog(QDialog):
         self.grid = QGridLayout()
         self.grid.addWidget(QLabel("name"), 0, 0)
         self.grid.addWidget(QLabel("weight"), 0, 1)
-        self.grid.addWidget(QLabel("resample/interpolation algo."), 0, 2)
+        self.resample_title = QLabel("resample/interpolation algo.")
+        self.grid.addWidget(self.resample_title, 0, 2)
         self.grid.addWidget(QLabel("utility func."), 0, 3)
 
         # for each layer a row of controls
@@ -85,25 +86,36 @@ class MarraquetaDialog(QDialog):
             ufunc_dropdown = QComboBox()
             # NO REORDER:
             ufunc_dropdown.addItems(
-                ["min-max", "max-min", "bi-piecewise-linear values", "bi-piecewise-linear percentage"]
+                [
+                    "min-max",
+                    "max-min",
+                    "bi-piecewise-linear values",
+                    "bi-piecewise-linear percentage",
+                    "step up value",
+                    "step up percentage",
+                    "step down value",
+                    "step down percentage",
+                ]
             )
             # signal for hiding/showing each parameters
             ufunc_dropdown.currentIndexChanged.connect(self.function_change)
             # add id to the dropdown
             ufunc_dropdown.row_id = i
             ufunc_layout.addWidget(ufunc_dropdown)
-            # minmax parameters
+
+            # MINMAX
             lbl1 = QLabel("")
             lbl1.func_id = 0
             lbl1.row_id = i
             ufunc_layout.addWidget(lbl1)
-            # maxmin parameters
+
+            # MAXMIN
             lbl2 = QLabel("")
             lbl2.func_id = 1
             lbl2.row_id = i
             ufunc_layout.addWidget(lbl2)
 
-            # piecewise-linear parameters
+            # PIECEWISE-LINEAR VALUES
             # a
             a_spinbox = QSpinBox()
             a_slider = QSlider(Qt.Orientation.Horizontal)
@@ -118,7 +130,7 @@ class MarraquetaDialog(QDialog):
                 elto.setVisible(False)
                 ufunc_layout.addWidget(elto)
 
-            # piecewise-linear parameters
+            # PIECEWISE-LINEAR PERCENTAGE
             # c
             c_spinbox = QSpinBox()
             c_slider = QSlider(Qt.Orientation.Horizontal)
@@ -130,6 +142,50 @@ class MarraquetaDialog(QDialog):
             for elto in [c_spinbox, c_slider, d_spinbox, d_slider]:
                 elto.row_id = i
                 elto.func_id = 3
+                elto.setVisible(False)
+                ufunc_layout.addWidget(elto)
+
+            # STEP UP VALUE
+            # e
+            e_spinbox = QSpinBox()
+            e_slider = QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(e_slider, e_spinbox)
+            for elto in [e_spinbox, e_slider]:
+                elto.row_id = i
+                elto.func_id = 4
+                elto.setVisible(False)
+                ufunc_layout.addWidget(elto)
+
+            # STEP UP PERCENTAGE
+            # f
+            f_spinbox = QSpinBox()
+            f_slider = QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(f_slider, f_spinbox)
+            for elto in [f_spinbox, f_slider]:
+                elto.row_id = i
+                elto.func_id = 5
+                elto.setVisible(False)
+                ufunc_layout.addWidget(elto)
+
+            # STEP DOWN VALUE
+            # g
+            g_spinbox = QSpinBox()
+            g_slider = QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(g_slider, g_spinbox)
+            for elto in [g_spinbox, g_slider]:
+                elto.row_id = i
+                elto.func_id = 6
+                elto.setVisible(False)
+                ufunc_layout.addWidget(elto)
+
+            # STEP DOWN PERCENTAGE
+            # h
+            h_spinbox = QSpinBox()
+            h_slider = QSlider(Qt.Orientation.Horizontal)
+            link_spinbox_slider(h_slider, h_spinbox)
+            for elto in [h_spinbox, h_slider]:
+                elto.row_id = i
+                elto.func_id = 7
                 elto.setVisible(False)
                 ufunc_layout.addWidget(elto)
 
@@ -149,6 +205,14 @@ class MarraquetaDialog(QDialog):
                     c_slider,
                     d_spinbox,
                     d_slider,
+                    e_spinbox,
+                    e_slider,
+                    f_spinbox,
+                    f_slider,
+                    g_spinbox,
+                    g_slider,
+                    h_slider,
+                    h_spinbox,
                 )
             )
 
@@ -170,6 +234,14 @@ class MarraquetaDialog(QDialog):
                     "c_slider": c_slider,
                     "d_spinbox": d_spinbox,
                     "d_slider": d_slider,
+                    "e_spinbox": e_spinbox,
+                    "e_slider": e_slider,
+                    "f_spinbox": f_spinbox,
+                    "f_slider": f_slider,
+                    "g_spinbox": g_spinbox,
+                    "g_slider": g_slider,
+                    "h_spinbox": h_spinbox,
+                    "h_slider": h_slider,
                 }
             ]
         self.input_groupbox.setLayout(self.grid)
@@ -219,6 +291,15 @@ class MarraquetaDialog(QDialog):
         label.setOpenExternalLinks(True)
         label.setAlignment(Qt.AlignLeft)
         hl.addWidget(label)
+
+        self.advanced_checkbox = QCheckBox("Advanced options")
+        self.target_groupbox.hide()
+        self.resample_title.hide()
+        for r in self.rows:
+            r["resample_dropdown"].hide()
+        self.advanced_checkbox.stateChanged.connect(self.handle_advanced_toggle)
+        hl.addWidget(self.advanced_checkbox)
+
         label = QLabel()
         label.setText('<a href="https://github.com/fire2a/qgis-pan-europeo/issues">issues</a>')
         label.setOpenExternalLinks(True)
@@ -227,7 +308,7 @@ class MarraquetaDialog(QDialog):
         self.verticalLayout.addLayout(hl)
 
         self.verticalLayout.addWidget(self.buttonBox)
-        # self.setupUi(self)
+        # self.setupUi(self) not using QtDesigner
 
     def reject(self):
         self.destroy()
@@ -265,6 +346,25 @@ class MarraquetaDialog(QDialog):
                     elto.setVisible(True)
                 else:
                     elto.setVisible(False)
+
+    def handle_advanced_toggle(self):
+        """show/hide advanced options"""
+        # from qgis.PyQt.QtCore import pyqtRemoveInputHook
+        # pyqtRemoveInputHook()
+        # import pdb
+        # pdb.set_trace()
+        # from IPython.terminal.embed import InteractiveShellEmbed
+        # InteractiveShellEmbed()()
+        if self.advanced_checkbox.isChecked():
+            self.target_groupbox.show()
+            self.resample_title.show()
+            for r in self.rows:
+                r["resample_dropdown"].show()
+        else:
+            self.target_groupbox.hide()
+            self.resample_title.hide()
+            for r in self.rows:
+                r["resample_dropdown"].hide()
 
 
 def link_spinbox_slider(slider, spinbox):

@@ -172,20 +172,20 @@ class Marraqueta:
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )
 
-        self.mc = self.iface.mapCanvas()
-        self.mc.scaleChanged.connect(self.handle_scale_change)
+        # self.mc = self.iface.mapCanvas()
+        # self.mc.scaleChanged.connect(self.handle_scale_change)
 
         # will be set False in run()
         self.first_start = True
 
-    def handle_scale_change(self, x):
-        msg = ""
-        if layer := self.iface.activeLayer():
-            extent = self.iface.mapCanvas().extent()
-            xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
-            ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
-            msg += f"{xsize=},\t{ysize=}"
-        qprint(f"zoom scale is {x},\t" + msg)
+    # def handle_scale_change(self, x):
+    #     msg = ""
+    #     if layer := self.iface.activeLayer():
+    #         extent = self.iface.mapCanvas().extent()
+    #         xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
+    #         ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
+    #         msg += f"{xsize=},\t{ysize=}"
+    #     qprint(f"zoom scale is {x},\t" + msg)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -219,8 +219,11 @@ class Marraqueta:
                 self.lyr_data += [{"layer": layer, "info": info, "name": layer.name()}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
                 qprint(f"{layer.name()=},\t{rimin=},\t{rimax=}")
-                for name in ["a_spinbox", "b_spinbox", "a_slider", "b_slider"]:
-                    dlg_row[name].setRange(rimin, rimax)
+                # set ranges for utility functions
+                for letters in ["a", "b", "e", "g"]:
+                    for wid in ["spinbox", "slider"]:
+                        name = f"{letters}_{wid}"
+                        dlg_row[name].setRange(rimin, rimax)
             qprint(f"{self.lyr_data=}")
             self.H = self.lyr_data[0]["info"]["RasterYSize"]
             self.W = self.lyr_data[0]["info"]["RasterXSize"]
@@ -238,18 +241,33 @@ class Marraqueta:
         # See if OK was pressed
         if result == 1:
             self.dlg.rescale_weights()
-
             extent = self.iface.mapCanvas().extent()
-            qprint(f"{extent=}")
-            ppta_x = self.dlg.resolution_x.value()
-            ppta_y = self.dlg.resolution_y.value()
-            px_size = self.dlg.pixel_size.value()
-            data_type = self.dlg.data_type.currentText()
-            qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
-            resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
-            qprint(f"{resolution=}")
+            # qprint(f"{extent=}")
 
+            # resolution calculation
+            # try the user input, else the first layer
+            if self.dlg.advanced_checkbox.isChecked():
+                ppta_x = self.dlg.resolution_x.value()
+                ppta_y = self.dlg.resolution_y.value()
+                px_size = self.dlg.pixel_size.value()
+                qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
+                resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
+                qprint(f"Advanced options, got {resolution=} (from user input unless current extent is smaller)")
+            else:
+                lyr_dic = self.dlg.rows[0]
+                lyr = self.iface.mapCanvas().layer(lyr_dic["layer_id"])
+                resx = round(extent.width() / lyr.rasterUnitsPerPixelX())
+                resy = round(extent.height() / lyr.rasterUnitsPerPixelY())
+                resolution = (resx, resy)
+                qprint(f"Basic options: got {resolution=} from first layer")
+
+            # TODO variable datatypes
+            data_type = self.dlg.data_type.currentText()
+
+            # here we will store the final data
             final_data = np.zeros(resolution[::-1], dtype=DATATYPES[data_type]["numpy"])
+
+            #
             did_any = False
             for dlg_row in self.dlg.rows:
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
@@ -314,6 +332,22 @@ class Marraqueta:
                         else:
                             qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
                             continue
+                    elif 4 == ufdci:
+                        e = dlg_row["e_spinbox"].value()
+                        new_data = step_up_function_values(masked_data, e)
+                        did_any = True
+                    elif 5 == ufdci:
+                        f = dlg_row["f_spinbox"].value()
+                        new_data = step_up_function_percentage(masked_data, f)
+                        did_any = True
+                    elif 6 == ufdci:
+                        g = dlg_row["g_spinbox"].value()
+                        new_data = step_down_function_percentage(masked_data, g)
+                        did_any = True
+                    elif 7 == ufdci:
+                        h = dlg_row["h_spinbox"].value()
+                        new_data = step_down_function_percentage(masked_data, h)
+                        did_any = True
                     else:
                         from qgis.core import QgsException
 
@@ -333,7 +367,7 @@ class Marraqueta:
             afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
             # name the layer as resolution, pixel size and data type, and HHMMSS
             qprint(
-                f"Created {afile=}, {resolution=}, {px_size=}, {data_type=}",
+                f"Created {afile=}, {resolution=}, {data_type=}",
                 level=Qgis.Success,
             )
             # add the raster layer to the canvas
@@ -382,6 +416,34 @@ def bi_piecewise_linear_percentage(data, a, b):
     # TODO FIX DATATYPES? uint8, uint16 ?
     data[data < 0] = 0
     data[data > 1] = 1
+    return data
+
+
+def step_up_function_values(data, a):
+    data[data < a] = 0
+    data[data >= a] = 1
+    return data
+
+
+def step_up_function_percentage(data, a):
+    rela_delta = data.max() - data.min() / 100
+    real_a = rela_delta * a
+    data[data < real_a] = 0
+    data[data >= real_a] = 1
+    return data
+
+
+def step_down_function_values(data, a):
+    data[data > a] = 0
+    data[data <= a] = 1
+    return data
+
+
+def step_down_function_percentage(data, a):
+    rela_delta = data.max() - data.min() / 100
+    real_a = rela_delta * a
+    data[data > real_a] = 0
+    data[data <= real_a] = 1
     return data
 
 

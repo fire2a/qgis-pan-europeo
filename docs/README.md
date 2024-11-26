@@ -49,7 +49,7 @@ Reset: to clear the dialog, load another set of layers
 Cancel: to close the dialog and do nothing
 Ok: to calculate a new layer
 ```
-7. (FIXME) Export the new layer as a pdf or png file (right click on the layer > Export > Save as Image)
+You can export the new layer as a pdf or png file (right click on the layer > Export > Save as Image)
 
 ### Raster configuration
 For each available layer (must be local and written to disk) available configurations are:
@@ -61,6 +61,13 @@ For each available layer (must be local and written to disk) available configura
    b. Max-Min scaling, same but inverted  
    c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values  
    d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)  
+   e. Step Up function, with a single breakpoint setup as data real value
+   e. Step Up function, with a single breakpoint setup as percentage 
+   f. Step Down function, with a single breakpoint setup as data real value
+   f. Step Down function, with a single breakpoint setup as percentage 
+
+<img src="utility_functions.png" alt="utility functions graph" style="width:80%; height:80%;">
+
 5. Target raster creation setup:
    - By default setup to create a "HD (1920x1080 pixels) image with each pixel representing an hectare (100x100m) pixel size" to speed up the processing
    - Except when the zoom level is so high that the shown data is smaller than HD. In that case, the target raster will have the same resolution as the original raster in the actual viewport
