@@ -31,8 +31,8 @@ from fire2a.raster import read_raster
 from osgeo import gdal
 from osgeo.osr import SpatialReference
 from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
-                       QgsCoordinateTransform, QgsProject, QgsRasterLayer,
-                       QgsRectangle)
+                       QgsCoordinateTransform, QgsMapLayer, QgsProject,
+                       QgsRasterLayer, QgsRectangle)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
@@ -216,7 +216,7 @@ class Marraqueta:
             for dlg_row in self.dlg.rows:
                 layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
-                self.lyr_data += [{"layer": layer, "info": info, "name": layer.name()}]
+                self.lyr_data += [{"layer": layer, "info": info, "name": layer.name(), "extent": layer.extent()}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
                 qprint(f"{layer.name()=},\t{rimin=},\t{rimax=}")
                 # set ranges for utility functions
@@ -225,6 +225,18 @@ class Marraqueta:
                         name = f"{letters}_{wid}"
                         dlg_row[name].setRange(rimin, rimax)
             qprint(f"{self.lyr_data=}")
+            self.common_extent = self.lyr_data[0]["extent"]
+            for lyr in self.lyr_data[1:]:
+                self.common_extent = self.common_extent.intersect(lyr["extent"])
+            if self.common_extent.isEmpty():
+                qprint("No common extent between raster layers, aborting start", level=Qgis.Critical)
+                self.iface.messageBar().pushMessage(
+                    "Overlap between rasters is empty!",
+                    "Please make sure all rasters intersect PAN-BATIDO plugin",
+                    level=Qgis.Critical,
+                    duration=5,
+                )
+                return
             self.H = self.lyr_data[0]["info"]["RasterYSize"]
             self.W = self.lyr_data[0]["info"]["RasterXSize"]
             self.GT = self.lyr_data[0]["info"]["Transform"]
@@ -241,8 +253,32 @@ class Marraqueta:
         # See if OK was pressed
         if result == 1:
             self.dlg.rescale_weights()
-            extent = self.iface.mapCanvas().extent()
-            # qprint(f"{extent=}")
+
+            # extent calculation
+            # polygon selected?
+            if lyrs_w_selection := [
+                lyr
+                for lyr in QgsProject.instance().mapLayers().values()
+                if lyr and lyr.type() == QgsMapLayer.VectorLayer and lyr.selectedFeatureCount() == 1
+            ]:
+                if len(lyrs_w_selection) > 1:
+                    qprint("Warning: more than one layer with one selected feature, using the first one")
+                feat_bbox = lyrs_w_selection[0].selectedFeatures()[0].geometry().boundingBox()
+                extent = self.common_extent.intersect(feat_bbox)
+                if extent.isEmpty():
+                    qprint("No common extent between selected polygon and rasters", level=Qgis.Critical)
+                    self.iface.messageBar().pushMessage(
+                        "No overlap with area of study",
+                        "Please select make sure there's common ground",
+                        level=Qgis.Critical,
+                        duration=3,
+                    )
+                    return
+            # visible extent
+            else:
+                extent = self.common_extent.intersect(self.iface.mapCanvas().extent())
+                qprint(f"No feature selected using from visible {extent=}")
+            qprint(f"{extent.area()=}")
 
             # resolution calculation
             # try the user input, else the first layer
