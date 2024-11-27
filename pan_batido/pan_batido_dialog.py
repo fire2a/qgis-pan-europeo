@@ -25,7 +25,7 @@
 
 from functools import partial
 
-from qgis.core import Qgis
+from qgis.core import Qgis, QgsMapLayer
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QGroupBox,
@@ -62,6 +62,8 @@ class MarraquetaDialog(QDialog):
                 qprint(
                     f"layer {layer.name()} has no public source, skipping (is it written locally?)", level=Qgis.Warning
                 )
+            if layer.type() != QgsMapLayer.RasterLayer:
+                continue
             # name
             self.grid.addWidget(QLabel(layer.name()), i + 1, 0)
             # weight
@@ -315,7 +317,7 @@ class MarraquetaDialog(QDialog):
 
     def reset(self):
         self.destroy()
-        self = self.__init__()
+        self.__init__(self.parent())
 
     def rescale_weights(self):
         """all inputs should sum to 100"""

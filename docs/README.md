@@ -42,6 +42,7 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
     - optional: setup any CRS in meters like EPSG:3857
     - optional: open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "Marraqueta" tab
 2. Load a set of raster layers
+3. [Optional] Select a polygon feature to define the area of study (else the visible area will be used)
 3. Click on the "Pan European Proof of Concept" plugin icon
 4. Configure for each layer/row (see details [below](#raster-configuration))
 5. Configure target raster creation (only for advanced options mode else the first layer resolution is used)

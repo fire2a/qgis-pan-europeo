@@ -15,6 +15,8 @@ hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 
 changelog=
+        0.0.6 Added area of study by raster intersections and/or selected polygon bounding box
+        0.0.5 Added step-[up|down] functions, hide advanced options, removed map zoom awareness
         0.0.4 Separate utility functions for min-max & max-min, bi-piecewise-linear values & percentage
         0.0.3 UI grouped in inputs and outputs, bug fix on dialog always calculating
         0.0.2 Handling of nans and nodatas, qgis pseudocolor painting and no resample option
