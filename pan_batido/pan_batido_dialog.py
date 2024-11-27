@@ -315,7 +315,7 @@ class MarraquetaDialog(QDialog):
 
     def reset(self):
         self.destroy()
-        self = self.__init__()
+        self.__init__(self.parent())
 
     def rescale_weights(self):
         """all inputs should sum to 100"""
