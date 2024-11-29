@@ -73,10 +73,13 @@ For each available layer (must be local and written to disk) available configura
 
 <img src="utility_functions.png" alt="utility functions graph" style="width:80%; height:80%;">
 
-Notice that for the Bi-Piecewise-Linear functions (c. and d.) crossing the breakpoints will invert the function.  
-And if one of them is zero, the function looks like:
+Notice that for the Bi-Piecewise-Linear functions (c. and d.) crossing the breakpoints will invert the function's slope.  
+Also in the case that one of them being zero (or minimun observation) a flat part is removed, e.g., `a=0 and b>0`:
 
 <img src="utility_function_2pw_azero.png" alt="utility function a=0" style="width:30%; height:30%;">
+
+You get up-slope and flat. Conversely, if `b=0 and a>0`, the graph will be reflected the vertically (as c. and d.), getting flat and down-slope.  
+Finally by one of them being 1 (or maximun observation) instead of 0, you get the other flat part removed.
 
 5. [Advanced] Target raster creation setup:
    - If enabled, by default, creates a HD (1920x1080 pixels) image with each pixel representing an hectare (100x100m) pixel size; this values can be adjusted. With a trade-off on the final raster size and processing time.
