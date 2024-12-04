@@ -195,7 +195,7 @@ class Marraqueta:
 
     def run(self):
         """Run method that performs all the real work"""
-        qprint("current layers", self.iface.mapCanvas().layers())
+        # qprint("current layers", self.iface.mapCanvas().layers())
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
@@ -218,13 +218,14 @@ class Marraqueta:
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
                 self.lyr_data += [{"layer": layer, "info": info, "name": layer.name(), "extent": layer.extent()}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
-                qprint(f"{layer.name()=},\t{rimin=},\t{rimax=}")
+                xsize, ysize = info["RasterXSize"], info["RasterYSize"]
+                qprint(f"layer name: {layer.name()}, value range ({rimin},{rimax}), size w: {xsize}, h:{ysize}")
                 # set ranges for utility functions
                 for letters in ["a", "b", "e", "g"]:
                     for wid in ["spinbox", "slider"]:
                         name = f"{letters}_{wid}"
                         dlg_row[name].setRange(rimin, rimax)
-            qprint(f"{self.lyr_data=}")
+            # qprint(f"{self.lyr_data=}")
             self.common_extent = self.lyr_data[0]["extent"]
             for lyr in self.lyr_data[1:]:
                 self.common_extent = self.common_extent.intersect(lyr["extent"])
@@ -242,7 +243,7 @@ class Marraqueta:
             self.GT = self.lyr_data[0]["info"]["Transform"]
             self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
             self.srs = SpatialReference().ImportFromWkt(self.lyr_data[0]["layer"].crs().toWkt())
-            qprint(f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}, srs:{self.srs}")
+            # qprint(f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}, srs:{self.srs}")
             qprint("not checking if rasters match!", level=Qgis.Warning)
 
         # show the dialog
@@ -278,7 +279,7 @@ class Marraqueta:
             else:
                 extent = self.common_extent.intersect(self.iface.mapCanvas().extent())
                 qprint(f"No feature selected using from visible {extent=}")
-            qprint(f"{extent.area()=}")
+            # qprint(f"{extent.area()=}")
 
             # resolution calculation
             # try the user input, else the first layer
