@@ -1,3 +1,5 @@
+| Branding & testing by Felipe De La Barra felipedelabarra@fire2a.com | Developed by fdobad.82 @ [Signal App](https://signal.org) |
+| --- | --- |
 # <img src="marraqueta.png" alt="toolbar-icon" style="width:50px; height:50px;"> Pan European Proof of Concept <img src="marraqueta3.png" alt="toolbar-icon" style="width:50px; height:50px;">
 
 - [Quick start](#quick-start)
