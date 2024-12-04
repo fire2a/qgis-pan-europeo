@@ -137,3 +137,4 @@ Each target raster is expected to have billion pixels and the resampling method 
 | Developer docs |  https://www.github.com/fire2a | Pull Requests |
 
 Developed by fdobad.82 @ [Signal App](https://signal.org)
+Branding & testing by Felipe De La Barra felipedelabarra@fire2a.com 
