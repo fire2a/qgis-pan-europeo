@@ -25,7 +25,7 @@
 
 from functools import partial
 
-from qgis.core import Qgis, QgsMapLayer
+from qgis.core import Qgis, QgsMapLayer, QgsProject
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QGroupBox,
@@ -57,7 +57,8 @@ class MarraquetaDialog(QDialog):
 
         # for each layer a row of controls
         self.rows = []
-        for i, layer in enumerate(iface.mapCanvas().layers()):
+        for i, (lid,layer) in enumerate(QgsProject.instance().mapLayers().items()):
+            # qprint(f"layer {layer.name()}")
             if layer.publicSource() == "":
                 qprint(
                     f"layer {layer.name()} has no public source, skipping (is it written locally?)", level=Qgis.Warning
@@ -217,6 +218,12 @@ class MarraquetaDialog(QDialog):
                     h_spinbox,
                 )
             )
+            if QgsProject.instance().layerTreeRoot().findLayer(lid).isVisible():
+                # qprint(f"layer {layer.name()} is visible")
+                checkbox.setChecked(True)
+            else:
+                # qprint(f"layer {layer.name()} is NOT visible")
+                checkbox.setChecked(False)
 
             self.grid.addLayout(ufunc_layout, i + 1, 3)
             self.rows += [
