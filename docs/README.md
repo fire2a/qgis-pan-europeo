@@ -18,7 +18,8 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
 
 ## Quick start
 - Install QGIS (latest desktop version on qgis.org)
-- On the QGIS menu, go to Plugins > Manage and Install Plugins 
+- On the QGIS menu, go to Plugins > Manage and Install Plugins
+- Enable experimental Plugins on Settings section     
 - All (vertical tab on the left) > Search for "Pan European Proof of Concept" (top horizontal input) > Select the plugin (checkbox) > Click "Install" (bottom right)
 - The plugin will be available on the "Plugins" section of the toolbar or on the "Plugins" menu, by clicking on the icon:
   
