@@ -31,7 +31,6 @@ from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QGroupBox,
                                  QHBoxLayout, QLabel, QSizePolicy, QSlider,
                                  QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
-from qgis.utils import iface
 
 from .config import DATATYPES, GRIORAS, qprint
 
@@ -57,7 +56,8 @@ class MarraquetaDialog(QDialog):
 
         # for each layer a row of controls
         self.rows = []
-        for i, (lid,layer) in enumerate(QgsProject.instance().mapLayers().items()):
+        i = 0
+        for lid, layer in QgsProject.instance().mapLayers().items():
             # qprint(f"layer {layer.name()}")
             if layer.publicSource() == "":
                 qprint(
@@ -253,6 +253,8 @@ class MarraquetaDialog(QDialog):
                     "h_slider": h_slider,
                 }
             ]
+            i += 1
+
         self.input_groupbox.setLayout(self.grid)
         self.verticalLayout.addWidget(self.input_groupbox)
 
