@@ -75,6 +75,7 @@ class Marraqueta:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        self.common_extent = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
