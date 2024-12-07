@@ -218,24 +218,34 @@ class Marraqueta:
                 # layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
                 layer = QgsProject.instance().layerTreeRoot().findLayer(dlg_row["layer_id"]).layer()
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
-                self.lyr_data += [{"layer": layer, "info": info, "name": layer.name(), "extent": layer.extent()}]
+                self.lyr_data += [
+                    {"layer": layer, "info": info, "name": layer.name(), "extent": layer.extent(), "crs": layer.crs()}
+                ]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
                 xsize, ysize = info["RasterXSize"], info["RasterYSize"]
-                qprint(f"layer name: {layer.name()}, value range ({rimin},{rimax}), size w: {xsize}, h:{ysize}")
+                qprint(
+                    f"layer name: {layer.name()}, value range ({rimin},{rimax}), size w: {xsize}, h:{ysize}, authid: {layer.crs().authid()},  id: {dlg_row['layer_id']}"
+                )
                 # set ranges for utility functions
                 for letters in ["a", "b", "e", "g"]:
                     for wid in ["spinbox", "slider"]:
                         name = f"{letters}_{wid}"
                         dlg_row[name].setRange(rimin, rimax)
             # qprint(f"{self.lyr_data=}")
-            self.common_extent = self.lyr_data[0]["extent"]
+            self.common_extent = projected_extent(self.lyr_data[0]["extent"], self.lyr_data[0]["crs"])
+            # qprint(f"0 {self.common_extent=}")
+            # cc = 0
             for lyr in self.lyr_data[1:]:
-                self.common_extent = self.common_extent.intersect(lyr["extent"])
+                self.common_extent = self.common_extent.intersect(
+                    projected_extent(lyr["extent"], self.lyr_data[0]["crs"])
+                )
+                # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
+                # cc += 1
             if self.common_extent.isEmpty():
                 qprint("No common extent between raster layers, aborting start", level=Qgis.Critical)
                 self.iface.messageBar().pushMessage(
                     "Overlap between rasters is empty!",
-                    "Please make sure all rasters intersect PAN-BATIDO plugin",
+                    "Please make sure all rasters intersect PAN-BATIDO plugin and restart it",
                     level=Qgis.Critical,
                     duration=5,
                 )
@@ -266,8 +276,9 @@ class Marraqueta:
             ]:
                 if len(lyrs_w_selection) > 1:
                     qprint("Warning: more than one layer with one selected feature, using the first one")
-                feat_bbox = lyrs_w_selection[0].selectedFeatures()[0].geometry().boundingBox()
-                extent = self.common_extent.intersect(feat_bbox)
+                lyrs_w_selection = lyrs_w_selection[0]
+                feat_bbox = lyrs_w_selection.selectedFeatures()[0].geometry().boundingBox()
+                extent = self.common_extent.intersect(projected_extent(feat_bbox, lyrs_w_selection.crs()))
                 if extent.isEmpty():
                     qprint("No common extent between selected polygon and rasters", level=Qgis.Critical)
                     self.iface.messageBar().pushMessage(
@@ -672,6 +683,14 @@ def get_extent_size(extent: QgsRectangle):
     height = extent_meters.height()
     qprint(f"get_extent_size  {width=}, {height=}")
     return width, height
+
+
+def projected_extent(
+    extent: QgsRectangle,
+    crs_from: QgsCoordinateReferenceSystem,
+    crs_to: QgsCoordinateReferenceSystem = QgsProject.instance().crs(),
+):
+    return QgsCoordinateTransform(crs_from, crs_to, QgsProject.instance()).transformBoundingBox(extent)
 
 
 def resolution_filter(extent: QgsRectangle, resolution=(1920, 1080), pixel_size=100):
