@@ -215,7 +215,8 @@ class Marraqueta:
             self.dlg = MarraquetaDialog()
             self.lyr_data = []
             for dlg_row in self.dlg.rows:
-                layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
+                # layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
+                layer = QgsProject.instance().layerTreeRoot().findLayer(dlg_row["layer_id"]).layer()
                 _, info = read_raster(layer.publicSource(), data=False, info=True)
                 self.lyr_data += [{"layer": layer, "info": info, "name": layer.name(), "extent": layer.extent()}]
                 rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
