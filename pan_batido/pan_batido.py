@@ -237,7 +237,7 @@ class Marraqueta:
             # cc = 0
             for lyr in self.lyr_data[1:]:
                 self.common_extent = self.common_extent.intersect(
-                    projected_extent(lyr["extent"], self.lyr_data[0]["crs"])
+                    projected_extent(lyr["extent"], lyr["crs"])
                 )
                 # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
                 # cc += 1
