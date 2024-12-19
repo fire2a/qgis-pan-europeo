@@ -75,6 +75,7 @@ class Marraqueta:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        self.dlg = None
         self.common_extent = None
 
     # noinspection PyMethodMayBeStatic
@@ -178,6 +179,7 @@ class Marraqueta:
 
         # will be set False in run()
         self.first_start = True
+        self.dlg = None
 
     # def handle_scale_change(self, x):
     #     msg = ""
@@ -201,6 +203,7 @@ class Marraqueta:
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
+            get_max_array_size(DATATYPES)
             if len(self.iface.mapCanvas().layers()) == 0:
                 qprint("No layers loaded. Not loading the dialog!", level=Qgis.Critical)
                 # display a message in system toolbar
@@ -236,9 +239,7 @@ class Marraqueta:
             # qprint(f"0 {self.common_extent=}")
             # cc = 0
             for lyr in self.lyr_data[1:]:
-                self.common_extent = self.common_extent.intersect(
-                    projected_extent(lyr["extent"], lyr["crs"])
-                )
+                self.common_extent = self.common_extent.intersect(projected_extent(lyr["extent"], lyr["crs"]))
                 # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
                 # cc += 1
             if self.common_extent.isEmpty():
@@ -292,7 +293,7 @@ class Marraqueta:
             else:
                 extent = self.common_extent.intersect(self.iface.mapCanvas().extent())
                 qprint(f"No feature selected using from visible {extent=}")
-            # qprint(f"{extent.area()=}")
+            qprint(f"{extent.area()=}")
 
             # resolution calculation
             # try the user input, else the first layer
@@ -311,8 +312,23 @@ class Marraqueta:
                 resolution = (resx, resy)
                 qprint(f"Basic options: got {resolution=} from first layer")
 
-            # TODO variable datatypes
+            # TODO test variable datatypes casting of data, are they auto rescaled or cut?
             data_type = self.dlg.data_type.currentText()
+
+            # Calculate the size of the array
+            array_size = abs(np.prod(resolution) * np.dtype(DATATYPES[data_type]["numpy"]).itemsize)
+            qprint(f"{array_size=}")
+
+            # Check if the array size exceeds the maximum allowable size
+            if array_size > DATATYPES[data_type]["max"]:
+                # Calculate the scaling factor to reduce the resolution
+                scaling_factor = (DATATYPES[data_type]["max"] / array_size) ** 0.5
+                new_resolution = (int(resolution[0] * scaling_factor), int(resolution[1] * scaling_factor))
+                qprint(
+                    f"Resolution too high, adjusted {resolution=} to {new_resolution=} to fit within memory limits.",
+                    level=Qgis.Warning,
+                )
+                resolution = new_resolution
 
             # here we will store the final data
             final_data = np.zeros(resolution[::-1], dtype=DATATYPES[data_type]["numpy"])
@@ -328,7 +344,7 @@ class Marraqueta:
                     # get data
                     lyr_data, srs = get_sampled_raster_data(
                         lyr["layer"].publicSource(),
-                        extent,
+                        projected_extent(extent, QgsProject.instance().crs(), lyr["crs"]),
                         resolution,
                         GRIORAS[dlg_row["resample_dropdown"].currentText()],
                         DATATYPES[data_type]["gdal"],
@@ -718,3 +734,38 @@ def progress_callback(pct, message, data, layer_name=""):
     # format pct as percetage
     qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
     return 1  # Return 1 to continue processing, or 0 to cancel
+
+
+def get_max_array_size(DATATYPES):
+    for k, v in DATATYPES.items():
+        for i in range(42):
+            try:
+                np.zeros(10**i, dtype=v["numpy"])
+            except:
+                break
+        DATATYPES[k]["max"] = min(10 ** (i - 1), np.iinfo(np.intp).max) - 2
+    qprint(DATATYPES)
+
+
+def get_raster_map_layers(iface, extent=None):
+    ret = []
+    for layer_id, layer in QgsProject.instance().mapLayers().items():
+        if (layer.type() == QgsMapLayer.RasterLayer) and (Path(layer.publicSource()).is_file()):
+            provider = layer.dataProvider()
+            if extent:
+                stats = provider.bandStatistics(1, Qgis.RasterBandStatistic.Min | Qgis.RasterBandStatistic.Max, extent)
+            else:
+                stats = provider.bandStatistics(1, Qgis.RasterBandStatistic.Min | Qgis.RasterBandStatistic.Max)
+            rmin, rmax = int(np.floor(stats.minimumValue)), int(np.ceil(stats.maximumValue))
+            ret += [
+                {
+                    "lid": layer_id,
+                    "name": layer.name(),
+                    "extent": layer.extent(),
+                    "crs": layer.crs(),
+                    "publicSource": layer.publicSource(),
+                    "min": rmin,
+                    "max": rmax,
+                }
+            ]
+    return ret
