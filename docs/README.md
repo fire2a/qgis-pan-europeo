@@ -1,4 +1,4 @@
-# <img src="marraqueta.png" alt="toolbar-icon" style="width:50px; height:50px;"> Pan European Proof of Concept <img src="marraqueta3.png" alt="toolbar-icon" style="width:50px; height:50px;">
+# <img src="europe_icon.png" alt="toolbar-icon" style="width:50px; height:50px;"> Pan European Proof of Concept <img src="europe_icon.png" alt="toolbar-icon" style="width:50px; height:50px;">
 
 - [Quick start](#quick-start)
 - [How to use](#how-to-use) 
@@ -8,9 +8,7 @@
 
 This QGIS plugin allows its users to calculate a summary cualitative raster from a set of large rasters; by defining for each one its relative weight, utility attribute function parameters, and optionally, a resampling method for each input and a target resolution for the output.
 
-Because the plugin is intended to process ~30 rasters at 100m pixel resolution (~30xGiB of data) a default resampling method and target precision configuration is provided; Although the plugin can work with any available raster layers. And the target resolution can be skipped and the output resolution is set as the one of the first raster.
-
-Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will be hosting them soon enough!
+Because the plugin is intended to process ~30 rasters at 100m pixel resolution (~30xGiB of data) a default resampling method and target precision configuration is provided; Although the plugin can work with any available raster layers. The target resolution can be skipped and the output resolution is set as the one of the first raster.
 
 | Basic User Interface | Advanced Options Enabled |
 | --- | --- |
@@ -32,7 +30,7 @@ Contact the fire2a team for access to Erico's and TechnoSylva's rasters. We will
         </thead>
         <tbody>
             <tr>
-                <td><img src="marraqueta.png" alt="toolbar-icon" style="width:40%; height:40%;"></td>
+                <td><img src="europe_icon.png" alt="toolbar-icon" style="width:40%; height:40%;"></td>
             </tr>
         </tbody>
     </table>
