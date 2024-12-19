@@ -95,11 +95,13 @@ Each target raster is expected to have billion pixels and the resampling method 
         This is the default and fastest algorithm.
         It assigns the value of the closest pixel in the original raster to the corresponding pixel in the output array.
         This method can introduce sharp edges and blockiness in the resampled image.
+        Probably the most used method for categorical rasters.
 
     Bilinear:
         This method considers the four nearest neighboring pixels in the original raster.
         It calculates a weighted average of their values based on their distance to the new pixel location in the output array.
         Bilinear interpolation produces smoother results compared to nearest neighbor but may introduce some blurring.
+        Probably the most used method in rasters with continuous data.
 
     Cubic:
         This method involves a 4x4 neighborhood of pixels in the original raster.
