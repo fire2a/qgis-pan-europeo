@@ -168,7 +168,7 @@ class Marraqueta:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ":/plugins/pan_batido/resources/marraqueta.svg"
+        icon_path = ":/plugins/pan_batido/resources/europe_icon.png"
         self.add_action(
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )

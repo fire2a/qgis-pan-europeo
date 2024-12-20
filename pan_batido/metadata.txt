@@ -29,7 +29,7 @@ tags=python, raster summary, ponderation, multiattribute utility functions
 
 homepage=https://fire2a.github.io/qgis-pan-europeo
 category=Analysis
-icon=resources/marraqueta.png
+icon=resources/europe_icon.png
 # experimental flag
 experimental=True
 
