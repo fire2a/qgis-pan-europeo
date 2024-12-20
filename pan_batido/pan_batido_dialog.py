@@ -325,12 +325,27 @@ class MarraquetaDialog(QDialog):
         self.verticalLayout.addWidget(self.buttonBox)
         # self.setupUi(self) not using QtDesigner
 
+    def rejected(self, *args, **kwargs):
+        qprint(f"Dialog.rejected {args=}, {kwargs=}")
+        super().rejected(*args, **kwargs)
+
+    def finished(self, *args, **kwargs):
+        qprint(f"Dialog.finished {args=}, {kwargs=}")
+        super().finished(*args, **kwargs)
+
+    def accepted(self, *args, **kwargs):
+        qprint(f"Dialog.accepted {args=}, {kwargs=}")
+        super().accepted(*args, **kwargs)
+
     def reject(self):
+        qprint("Dialog.reject")
         self.destroy()
 
     def reset(self):
+        qprint("Dialog.reset")
+        parent = self.parent()
         self.destroy()
-        self.__init__(self.parent())
+        self.__init__(parent)
 
     def rescale_weights(self):
         """all inputs should sum to 100"""

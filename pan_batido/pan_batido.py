@@ -236,9 +236,7 @@ class Marraqueta:
             # qprint(f"0 {self.common_extent=}")
             # cc = 0
             for lyr in self.lyr_data[1:]:
-                self.common_extent = self.common_extent.intersect(
-                    projected_extent(lyr["extent"], lyr["crs"])
-                )
+                self.common_extent = self.common_extent.intersect(projected_extent(lyr["extent"], lyr["crs"]))
                 # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
                 # cc += 1
             if self.common_extent.isEmpty():
@@ -292,7 +290,7 @@ class Marraqueta:
             else:
                 extent = self.common_extent.intersect(self.iface.mapCanvas().extent())
                 qprint(f"No feature selected using from visible {extent=}")
-            # qprint(f"{extent.area()=}")
+            qprint(f"{extent.area()=}")
 
             # resolution calculation
             # try the user input, else the first layer
