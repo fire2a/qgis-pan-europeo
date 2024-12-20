@@ -216,6 +216,17 @@ class Marraqueta:
                 return
             self.first_start = False
             self.dlg = MarraquetaDialog()
+
+        self.rasters = get_raster_map_layers()
+        self.dlg.populate(self.rasters)
+
+        self.dlg.show()
+        # Run the dialog event loop
+        result = self.dlg.exec_()
+        return
+
+    def nope(self):
+        for a in b:
             self.lyr_data = []
             for dlg_row in self.dlg.rows:
                 # layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
@@ -747,25 +758,21 @@ def get_max_array_size(DATATYPES):
     qprint(DATATYPES)
 
 
-def get_raster_map_layers(iface, extent=None):
+def get_raster_map_layers(extent=None):
     ret = []
     for layer_id, layer in QgsProject.instance().mapLayers().items():
         if (layer.type() == QgsMapLayer.RasterLayer) and (Path(layer.publicSource()).is_file()):
-            provider = layer.dataProvider()
-            if extent:
-                stats = provider.bandStatistics(1, Qgis.RasterBandStatistic.Min | Qgis.RasterBandStatistic.Max, extent)
-            else:
-                stats = provider.bandStatistics(1, Qgis.RasterBandStatistic.Min | Qgis.RasterBandStatistic.Max)
-            rmin, rmax = int(np.floor(stats.minimumValue)), int(np.ceil(stats.maximumValue))
-            ret += [
+            _, info = read_raster(layer.publicSource(), data=False, info=True)
+            info.update(
                 {
                     "lid": layer_id,
                     "name": layer.name(),
-                    "extent": layer.extent(),
-                    "crs": layer.crs(),
+                    "visible": QgsProject.instance().layerTreeRoot().findLayer(layer_id).isVisible(),
+                    "extent": layer.extent().asWktPolygon(),
+                    "crs_poly": layer.crs().toWkt(),
+                    "authid": layer.crs().authid(),
                     "publicSource": layer.publicSource(),
-                    "min": rmin,
-                    "max": rmax,
                 }
-            ]
+            )
+            ret += [info]
     return ret
