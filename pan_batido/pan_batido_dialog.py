@@ -24,6 +24,7 @@
 """
 
 from functools import partial
+from pathlib import Path
 
 from qgis.core import Qgis, QgsMapLayer, QgsProject
 from qgis.PyQt.QtCore import Qt
@@ -31,7 +32,6 @@ from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QDialogButtonBox, QGridLayout, QGroupBox,
                                  QHBoxLayout, QLabel, QSizePolicy, QSlider,
                                  QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
-from qgis.utils import iface
 
 from .config import DATATYPES, GRIORAS, qprint
 
@@ -57,13 +57,16 @@ class MarraquetaDialog(QDialog):
 
         # for each layer a row of controls
         self.rows = []
-        for i, (lid,layer) in enumerate(QgsProject.instance().mapLayers().items()):
+        i = 0
+        for lid, layer in QgsProject.instance().mapLayers().items():
             # qprint(f"layer {layer.name()}")
-            if layer.publicSource() == "":
-                qprint(
-                    f"layer {layer.name()} has no public source, skipping (is it written locally?)", level=Qgis.Warning
-                )
             if layer.type() != QgsMapLayer.RasterLayer:
+                continue
+            if layer.publicSource() == "" or not Path(layer.publicSource()).is_file():
+                qprint(
+                    f"raster layer {layer.name()} has no public source, skipping (is it written locally?)",
+                    level=Qgis.Warning,
+                )
                 continue
             # name
             self.grid.addWidget(QLabel(layer.name()), i + 1, 0)
@@ -253,6 +256,9 @@ class MarraquetaDialog(QDialog):
                     "h_slider": h_slider,
                 }
             ]
+            i += 1
+            qprint(f"layer {layer.name()} added", level=Qgis.Success)
+
         self.input_groupbox.setLayout(self.grid)
         self.verticalLayout.addWidget(self.input_groupbox)
 

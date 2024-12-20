@@ -15,6 +15,8 @@ hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 
 changelog=
+        0.0.9 fail safe resolution, icon change
+        0.0.8 Skip non-rasters or non-local rasters on dialog creation, common transform of extents before intersection
         0.0.7 Also loads invisible rasters as disabled
         0.0.6 Added area of study by raster intersections and/or selected polygon bounding box
         0.0.5 Added step-[up|down] functions, hide advanced options, removed map zoom awareness
@@ -28,7 +30,7 @@ tags=python, raster summary, ponderation, multiattribute utility functions
 
 homepage=https://fire2a.github.io/qgis-pan-europeo
 category=Analysis
-icon=resources/marraqueta.png
+icon=resources/europe_icon.png
 # experimental flag
 experimental=True
 
