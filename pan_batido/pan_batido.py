@@ -23,8 +23,8 @@
 """
 import os.path
 import tempfile
-from functools import partial
 from pathlib import Path
+from time import time
 
 import numpy as np
 from fire2a.raster import read_raster
@@ -437,7 +437,7 @@ class Marraqueta:
             afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
             # name the layer as resolution, pixel size and data type, and HHMMSS
             qprint(
-                f"Created {afile=}, {resolution=}, {data_type=}",
+                f"Created {afile=}, {resolution=}, {data_type=}, by combining:",
                 level=Qgis.Success,
             )
             # add the raster layer to the canvas
@@ -447,10 +447,10 @@ class Marraqueta:
 
             log_instance_params = sorted(log_instance_params, key=lambda x: x["enabled"])
             for itm in log_instance_params:
-                if itm.get("skip", False):
-                    qprint(itm["name"], level=Qgis.Warning)
+                if not itm.get("enabled", False):
+                    qprint(itm, level=Qgis.Warning)
                     continue
-                qprint(itm)
+                qprint(itm, level=Qgis.Success)
 
 
 def min_max_scaling(data, dtype=None):
@@ -579,6 +579,7 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
             # callback=partial(progress_callback, layer_name=layer_name),
         )
     else:
+        progress_callback = ProgressCallback()
         data = band.ReadAsArray(
             xoff=xoff,
             yoff=yoff,
@@ -587,7 +588,8 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
             buf_xsize=resolution[0],
             buf_ysize=resolution[1],
             buf_type=gdt,
-            callback=partial(progress_callback, layer_name=layer_name),
+            callback=progress_callback,
+            callback_data=layer_name,
         )
     """
     ret_array = band1.ReadAsArray(
@@ -741,7 +743,34 @@ def current_displayed_pixels(iface):
     return xsize, ysize
 
 
-def progress_callback(pct, message, data, layer_name=""):
-    # format pct as percetage
-    qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
-    return 1  # Return 1 to continue processing, or 0 to cancel
+# basic callback function
+# def progress_callback(pct, message, data, layer_name=""):
+#     # format pct as percetage
+#     qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
+#     return 1  # Return 1 to continue processing, or 0 to cancel
+
+# callback that prints only when the percentage changes
+# class ProgressCallback:
+#     def __init__(self, delta_pct=0.1):
+#         self.delta_pct = delta_pct
+#         self.last = 0
+#
+#     def __call__(self, pct, message, data, layer_name=""):
+#         if pct - self.last > self.delta_pct:
+#             qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
+#             self.last = pct
+#         return 1
+
+
+# callback that prints only when time between calls is greater than wait[seconds]
+class ProgressCallback:
+    def __init__(self, wait=1):
+        self.wait = wait
+        self.last = 0
+
+    def __call__(self, pct, message, data, *args, **kwargs):
+        now = time()
+        if now - self.last > self.wait:
+            qprint(f"reading/resampling layer:{data} {pct:.2%}")
+            self.last = now
+        return 1
