@@ -236,9 +236,7 @@ class Marraqueta:
             # qprint(f"0 {self.common_extent=}")
             # cc = 0
             for lyr in self.lyr_data[1:]:
-                self.common_extent = self.common_extent.intersect(
-                    projected_extent(lyr["extent"], lyr["crs"])
-                )
+                self.common_extent = self.common_extent.intersect(projected_extent(lyr["extent"], lyr["crs"]))
                 # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
                 # cc += 1
             if self.common_extent.isEmpty():
@@ -319,10 +317,21 @@ class Marraqueta:
 
             #
             did_any = False
+            log_instance_params = []
             for dlg_row in self.dlg.rows:
+                lyr = self.lyr_data[dlg_row["i"]]
+                log_row = {
+                    "name": lyr["name"],
+                    "enabled": dlg_row["weight_checkbox"].isChecked(),
+                }
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
+                    log_row.update(
+                        {
+                            "weight": dlg_row["weight_spinbox"].value(),
+                            "utility function": dlg_row["ufunc_dropdown"].currentText(),
+                        }
+                    )
                     weight = dlg_row["weight_spinbox"].value()
-                    lyr = self.lyr_data[dlg_row["i"]]
                     lyr_name = lyr["name"]
                     lyr_nodata = lyr["info"]["NoDataValue"]
                     # get data
@@ -358,6 +367,8 @@ class Marraqueta:
                     elif 2 == ufdci:
                         a = dlg_row["a_spinbox"].value()
                         b = dlg_row["b_spinbox"].value()
+                        log_row["min"] = a
+                        log_row["max"] = b
                         if a != b:
                             new_data = bi_piecewise_linear_values(
                                 masked_data,
@@ -367,11 +378,14 @@ class Marraqueta:
                             did_any = True
                         else:
                             qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
+                            log_row["skip"] = True
                             continue
                     # bi_piecewise_linear_percentage
                     elif 3 == ufdci:
                         c = dlg_row["c_spinbox"].value()
                         d = dlg_row["d_spinbox"].value()
+                        log_row["min"] = c
+                        log_row["max"] = d
                         if c != d:
                             new_data = bi_piecewise_linear_percentage(
                                 masked_data,
@@ -381,23 +395,28 @@ class Marraqueta:
                             did_any = True
                         else:
                             qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
+                            log_row["skip"] = True
                             continue
                     elif 4 == ufdci:
                         e = dlg_row["e_spinbox"].value()
                         new_data = step_up_function_values(masked_data, e)
                         did_any = True
+                        log_row["threshold"] = e
                     elif 5 == ufdci:
                         f = dlg_row["f_spinbox"].value()
                         new_data = step_up_function_percentage(masked_data, f)
                         did_any = True
+                        log_row["threshold"] = f
                     elif 6 == ufdci:
                         g = dlg_row["g_spinbox"].value()
                         new_data = step_down_function_percentage(masked_data, g)
                         did_any = True
+                        log_row["threshold"] = g
                     elif 7 == ufdci:
                         h = dlg_row["h_spinbox"].value()
                         new_data = step_down_function_percentage(masked_data, h)
                         did_any = True
+                        log_row["threshold"] = h
                     else:
                         from qgis.core import QgsException
 
@@ -407,6 +426,7 @@ class Marraqueta:
                     qprint(f"layer: {lyr_name},\tshape:{new_data.shape},\tvalid:{valid:.2%}")
                     qprint(f"\t result histogram: {np.histogram(new_data,np.arange(0,1.1,0.1))}")
                     final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
+                log_instance_params += [log_row]
 
             if not did_any:
                 qprint("Nothing to do, all layers unselected or 0 weight")
@@ -424,6 +444,13 @@ class Marraqueta:
             layer = self.iface.addRasterLayer(afile, Path(afile).stem)
             if data_type not in ["Byte(0-255)", "UInt16(0-65535)"]:
                 qgis_paint(layer)
+
+            log_instance_params = sorted(log_instance_params, key=lambda x: x["enabled"])
+            for itm in log_instance_params:
+                if itm.get("skip", False):
+                    qprint(itm["name"], level=Qgis.Warning)
+                    continue
+                qprint(itm)
 
 
 def min_max_scaling(data, dtype=None):
