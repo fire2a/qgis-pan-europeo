@@ -30,3 +30,11 @@ GRIORAS = {
 def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="", **kwargs):
     QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)
     QCoreApplication.processEvents()
+
+
+def get_key_by_subdict_item(dict_, subkey, subval):
+    for key, sdict in dict_.items():
+        for sk, sv in sdict.items():
+            if sk == subkey and sv == subval:
+                return key
+    return None

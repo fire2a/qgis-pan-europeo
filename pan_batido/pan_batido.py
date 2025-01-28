@@ -23,8 +23,8 @@
 """
 import os.path
 import tempfile
-from functools import partial
 from pathlib import Path
+from time import time
 
 import numpy as np
 from fire2a.raster import read_raster
@@ -37,7 +37,7 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from .config import DATATYPES, GRIORAS, qprint
+from .config import DATATYPES, GRIORAS, get_key_by_subdict_item, qprint
 # Import the code for the dialog
 from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
@@ -236,9 +236,7 @@ class Marraqueta:
             # qprint(f"0 {self.common_extent=}")
             # cc = 0
             for lyr in self.lyr_data[1:]:
-                self.common_extent = self.common_extent.intersect(
-                    projected_extent(lyr["extent"], lyr["crs"])
-                )
+                self.common_extent = self.common_extent.intersect(projected_extent(lyr["extent"], lyr["crs"]))
                 # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
                 # cc += 1
             if self.common_extent.isEmpty():
@@ -319,10 +317,21 @@ class Marraqueta:
 
             #
             did_any = False
+            log_instance_params = []
             for dlg_row in self.dlg.rows:
+                lyr = self.lyr_data[dlg_row["i"]]
+                log_row = {
+                    "name": lyr["name"],
+                    "enabled": dlg_row["weight_checkbox"].isChecked(),
+                }
                 if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
+                    log_row.update(
+                        {
+                            "weight": dlg_row["weight_spinbox"].value(),
+                            "utility function": dlg_row["ufunc_dropdown"].currentText(),
+                        }
+                    )
                     weight = dlg_row["weight_spinbox"].value()
-                    lyr = self.lyr_data[dlg_row["i"]]
                     lyr_name = lyr["name"]
                     lyr_nodata = lyr["info"]["NoDataValue"]
                     # get data
@@ -358,6 +367,8 @@ class Marraqueta:
                     elif 2 == ufdci:
                         a = dlg_row["a_spinbox"].value()
                         b = dlg_row["b_spinbox"].value()
+                        log_row["min"] = a
+                        log_row["max"] = b
                         if a != b:
                             new_data = bi_piecewise_linear_values(
                                 masked_data,
@@ -367,11 +378,14 @@ class Marraqueta:
                             did_any = True
                         else:
                             qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
+                            log_row["skip"] = True
                             continue
                     # bi_piecewise_linear_percentage
                     elif 3 == ufdci:
                         c = dlg_row["c_spinbox"].value()
                         d = dlg_row["d_spinbox"].value()
+                        log_row["min"] = c
+                        log_row["max"] = d
                         if c != d:
                             new_data = bi_piecewise_linear_percentage(
                                 masked_data,
@@ -381,23 +395,28 @@ class Marraqueta:
                             did_any = True
                         else:
                             qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
+                            log_row["skip"] = True
                             continue
                     elif 4 == ufdci:
                         e = dlg_row["e_spinbox"].value()
                         new_data = step_up_function_values(masked_data, e)
                         did_any = True
+                        log_row["threshold"] = e
                     elif 5 == ufdci:
                         f = dlg_row["f_spinbox"].value()
                         new_data = step_up_function_percentage(masked_data, f)
                         did_any = True
+                        log_row["threshold"] = f
                     elif 6 == ufdci:
                         g = dlg_row["g_spinbox"].value()
                         new_data = step_down_function_percentage(masked_data, g)
                         did_any = True
+                        log_row["threshold"] = g
                     elif 7 == ufdci:
                         h = dlg_row["h_spinbox"].value()
                         new_data = step_down_function_percentage(masked_data, h)
                         did_any = True
+                        log_row["threshold"] = h
                     else:
                         from qgis.core import QgsException
 
@@ -407,6 +426,7 @@ class Marraqueta:
                     qprint(f"layer: {lyr_name},\tshape:{new_data.shape},\tvalid:{valid:.2%}")
                     qprint(f"\t result histogram: {np.histogram(new_data,np.arange(0,1.1,0.1))}")
                     final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
+                log_instance_params += [log_row]
 
             if not did_any:
                 qprint("Nothing to do, all layers unselected or 0 weight")
@@ -417,13 +437,20 @@ class Marraqueta:
             afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
             # name the layer as resolution, pixel size and data type, and HHMMSS
             qprint(
-                f"Created {afile=}, {resolution=}, {data_type=}",
+                f"Created {afile=}, {resolution=}, {data_type=}, by combining:",
                 level=Qgis.Success,
             )
             # add the raster layer to the canvas
             layer = self.iface.addRasterLayer(afile, Path(afile).stem)
             if data_type not in ["Byte(0-255)", "UInt16(0-65535)"]:
                 qgis_paint(layer)
+
+            log_instance_params = sorted(log_instance_params, key=lambda x: x["enabled"])
+            for itm in log_instance_params:
+                if not itm.get("enabled", False):
+                    qprint(itm, level=Qgis.Warning)
+                    continue
+                qprint(itm, level=Qgis.Success)
 
 
 def min_max_scaling(data, dtype=None):
@@ -521,7 +548,9 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
         griora=0
         gdt=7
     """
-    qprint(f"{raster_path=}, {extent=}, {resolution=}, {griora=}, {gdt=}, {layer_name=}")
+    qprint(
+        f"layer={layer_name}, {extent=}, {resolution=}, griora={list(GRIORAS.keys())[griora]}, datatype={get_key_by_subdict_item(DATATYPES,'gdal',gdt)}, {raster_path=}"
+    )
     dataset = gdal.Open(raster_path)
     if dataset is None:
         raise ValueError("Could not open raster file")
@@ -552,6 +581,7 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
             # callback=partial(progress_callback, layer_name=layer_name),
         )
     else:
+        progress_callback = ProgressCallback()
         data = band.ReadAsArray(
             xoff=xoff,
             yoff=yoff,
@@ -560,7 +590,8 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
             buf_xsize=resolution[0],
             buf_ysize=resolution[1],
             buf_type=gdt,
-            callback=partial(progress_callback, layer_name=layer_name),
+            callback=progress_callback,
+            callback_data=layer_name,
         )
     """
     ret_array = band1.ReadAsArray(
@@ -714,7 +745,34 @@ def current_displayed_pixels(iface):
     return xsize, ysize
 
 
-def progress_callback(pct, message, data, layer_name=""):
-    # format pct as percetage
-    qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
-    return 1  # Return 1 to continue processing, or 0 to cancel
+# basic callback function
+# def progress_callback(pct, message, data, layer_name=""):
+#     # format pct as percetage
+#     qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
+#     return 1  # Return 1 to continue processing, or 0 to cancel
+
+# callback that prints only when the percentage changes
+# class ProgressCallback:
+#     def __init__(self, delta_pct=0.1):
+#         self.delta_pct = delta_pct
+#         self.last = 0
+#
+#     def __call__(self, pct, message, data, layer_name=""):
+#         if pct - self.last > self.delta_pct:
+#             qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
+#             self.last = pct
+#         return 1
+
+
+# callback that prints only when time between calls is greater than wait[seconds]
+class ProgressCallback:
+    def __init__(self, wait=1):
+        self.wait = wait
+        self.last = 0
+
+    def __call__(self, pct, message, data, *args, **kwargs):
+        now = time()
+        if now - self.last > self.wait:
+            qprint(f"layer:{data} reading/resampling {pct:.2%}")
+            self.last = now
+        return 1
