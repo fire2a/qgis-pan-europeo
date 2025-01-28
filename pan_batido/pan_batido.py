@@ -37,7 +37,7 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from .config import DATATYPES, GRIORAS, qprint
+from .config import DATATYPES, GRIORAS, get_key_by_subdict_item, qprint
 # Import the code for the dialog
 from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
@@ -548,7 +548,9 @@ def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora
         griora=0
         gdt=7
     """
-    qprint(f"{raster_path=}, {extent=}, {resolution=}, {griora=}, {gdt=}, {layer_name=}")
+    qprint(
+        f"layer={layer_name}, {extent=}, {resolution=}, griora={list(GRIORAS.keys())[griora]}, datatype={get_key_by_subdict_item(DATATYPES,'gdal',gdt)}, {raster_path=}"
+    )
     dataset = gdal.Open(raster_path)
     if dataset is None:
         raise ValueError("Could not open raster file")
