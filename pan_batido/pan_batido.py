@@ -773,6 +773,6 @@ class ProgressCallback:
     def __call__(self, pct, message, data, *args, **kwargs):
         now = time()
         if now - self.last > self.wait:
-            qprint(f"reading/resampling layer:{data} {pct:.2%}")
+            qprint(f"layer:{data} reading/resampling {pct:.2%}")
             self.last = now
         return 1
