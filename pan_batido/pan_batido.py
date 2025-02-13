@@ -329,6 +329,7 @@ class Marraqueta:
                         {
                             "weight": dlg_row["weight_spinbox"].value(),
                             "utility function": dlg_row["ufunc_dropdown"].currentText(),
+                            "resample method": dlg_row["resample_dropdown"].currentText(),
                         }
                     )
                     weight = dlg_row["weight_spinbox"].value()
@@ -448,9 +449,9 @@ class Marraqueta:
             log_instance_params = sorted(log_instance_params, key=lambda x: x["enabled"])
             for itm in log_instance_params:
                 if not itm.get("enabled", False):
-                    qprint(itm, level=Qgis.Warning)
+                    qprint(f"  {itm}", level=Qgis.Warning)
                     continue
-                qprint(itm, level=Qgis.Success)
+                qprint(f"  {itm}", level=Qgis.Success)
 
 
 def min_max_scaling(data, dtype=None):
@@ -773,6 +774,6 @@ class ProgressCallback:
     def __call__(self, pct, message, data, *args, **kwargs):
         now = time()
         if now - self.last > self.wait:
-            qprint(f"layer:{data} reading/resampling {pct:.2%}")
+            qprint(f"  progress on {data} layer: {pct:.2%}")
             self.last = now
         return 1
