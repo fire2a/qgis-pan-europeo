@@ -24,10 +24,12 @@
 import os.path
 import tempfile
 from pathlib import Path
+from tempfile import mktemp
 from time import time
 
 import numpy as np
-from fire2a.raster import read_raster
+from fire2a.raster import (extent_to_projwin, gdal_calc_norm, gdal_calc_sum,
+                           read_raster)
 from osgeo import gdal
 from osgeo.osr import SpatialReference
 from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
@@ -37,7 +39,8 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from .config import DATATYPES, GRIORAS, get_key_by_subdict_item, qprint
+from .config import (DATATYPES, GRIORAS, UTILITY_FUNCTIONS,
+                     get_key_by_subdict_item, qprint)
 # Import the code for the dialog
 from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
@@ -318,6 +321,8 @@ class Marraqueta:
             #
             did_any = False
             log_instance_params = []
+            outfiles = []
+            weights = []
             for dlg_row in self.dlg.rows:
                 lyr = self.lyr_data[dlg_row["i"]]
                 log_row = {
@@ -335,105 +340,146 @@ class Marraqueta:
                     weight = dlg_row["weight_spinbox"].value()
                     lyr_name = lyr["name"]
                     lyr_nodata = lyr["info"]["NoDataValue"]
-                    # get data
-                    lyr_data, srs = get_sampled_raster_data(
-                        lyr["layer"].publicSource(),
-                        extent,
-                        resolution,
-                        GRIORAS[dlg_row["resample_dropdown"].currentText()],
-                        DATATYPES[data_type]["gdal"],
-                        layer_name=lyr_name,
-                    )
-                    # mask nan & nodata
-                    masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data) | (lyr_data == lyr_nodata))
-                    # masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data))
-                    # qprint(f"{masked_data.mask.sum()=}")
-                    # utility function dropdown current index
+
                     ufdci = dlg_row["ufunc_dropdown"].currentIndex()
-                    # min_max_scaling
-                    if 0 == ufdci:
-                        new_data = min_max_scaling(
-                            masked_data,
-                            dtype=DATATYPES[data_type]["numpy"],
+                    # ask tempfile for a file
+                    infile = lyr["layer"].publicSource()
+                    outfile = tempfile.mktemp(prefix=Path(lyr["layer"].publicSource()).stem, suffix=".tif")
+                    method = UTILITY_FUNCTIONS[ufdci]["name"]
+                    nodata = lyr_nodata
+                    projwin = extent_to_projwin(extent)
+                    match method:
+                        case "minmax" | "maxmin":
+                            params = None
+                        case "bipiecewiselinear":
+                            params = [dlg_row["a_spinbox"].value(), dlg_row["b_spinbox"].value()]
+                        case "bipiecewiselinear_percent":
+                            params = [dlg_row["c_spinbox"].value(), dlg_row["d_spinbox"].value()]
+                        case "stepup":
+                            params = [dlg_row["e_spinbox"].value()]
+                        case "stepup_percent":
+                            params = [dlg_row["f_spinbox"].value()]
+                        case "stepdown":
+                            params = [dlg_row["e_spinbox"].value()]
+                        case "stepdown_percent":
+                            params = [dlg_row["h_spinbox"].value()]
+                        case _:
+                            raise ValueError(f"Utility function at index:{ufdci} not implemented")
+
+                    if params:
+                        gdal_calc_norm.main(
+                            ["-i", infile, "-o", outfile, "-m", method, "-n", nodata, "-p", projwin, *params]
                         )
-                        did_any = True
-                    # max_min_scaling
-                    elif 1 == ufdci:
-                        new_data = max_min_scaling(
-                            masked_data,
-                            dtype=DATATYPES[data_type]["numpy"],
-                        )
-                        did_any = True
-                    # bi_piecewise_linear_values
-                    elif 2 == ufdci:
-                        a = dlg_row["a_spinbox"].value()
-                        b = dlg_row["b_spinbox"].value()
-                        log_row["min"] = a
-                        log_row["max"] = b
-                        if a != b:
-                            new_data = bi_piecewise_linear_values(
-                                masked_data,
-                                a,
-                                b,
-                            )
-                            did_any = True
-                        else:
-                            qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
-                            log_row["skip"] = True
-                            continue
-                    # bi_piecewise_linear_percentage
-                    elif 3 == ufdci:
-                        c = dlg_row["c_spinbox"].value()
-                        d = dlg_row["d_spinbox"].value()
-                        log_row["min"] = c
-                        log_row["max"] = d
-                        if c != d:
-                            new_data = bi_piecewise_linear_percentage(
-                                masked_data,
-                                c,
-                                d,
-                            )
-                            did_any = True
-                        else:
-                            qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
-                            log_row["skip"] = True
-                            continue
-                    elif 4 == ufdci:
-                        e = dlg_row["e_spinbox"].value()
-                        new_data = step_up_function_values(masked_data, e)
-                        did_any = True
-                        log_row["threshold"] = e
-                    elif 5 == ufdci:
-                        f = dlg_row["f_spinbox"].value()
-                        new_data = step_up_function_percentage(masked_data, f)
-                        did_any = True
-                        log_row["threshold"] = f
-                    elif 6 == ufdci:
-                        g = dlg_row["g_spinbox"].value()
-                        new_data = step_down_function_percentage(masked_data, g)
-                        did_any = True
-                        log_row["threshold"] = g
-                    elif 7 == ufdci:
-                        h = dlg_row["h_spinbox"].value()
-                        new_data = step_down_function_percentage(masked_data, h)
-                        did_any = True
-                        log_row["threshold"] = h
                     else:
-                        from qgis.core import QgsException
+                        gdal_calc_norm.main(
+                            ["-i", infile, "-o", outfile, "-m", method, "-n", nodata, "-p", projwin, *params]
+                        )
 
-                        raise QgsException(f"Utility function at index:{ufdci} not implemented")
+                    outfiles += [outfile]
+                    weights += [weight / 100]
 
-                    valid = 1 - masked_data.mask.sum() / np.prod(masked_data.shape)
-                    qprint(f"layer: {lyr_name},\tshape:{new_data.shape},\tvalid:{valid:.2%}")
-                    qprint(f"\t result histogram: {np.histogram(new_data,np.arange(0,1.1,0.1))}")
-                    final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
+                final_data = mktemp(suffix=".tif")
+                gdal_calc_sum.main(["-o", final_data, "-i", outfiles, "-w", weights, "-p", projwin, "-n", -9999])
+
+                # # get data
+                # lyr_data, srs = get_sampled_raster_data(
+                #     lyr["layer"].publicSource(),
+                #     extent,
+                #     resolution,
+                #     GRIORAS[dlg_row["resample_dropdown"].currentText()],
+                #     DATATYPES[data_type]["gdal"],
+                #     layer_name=lyr_name,
+                # )
+                # # mask nan & nodata
+                # masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data) | (lyr_data == lyr_nodata))
+                # # masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data))
+                # # qprint(f"{masked_data.mask.sum()=}")
+                # # utility function dropdown current index
+                # ufdci = dlg_row["ufunc_dropdown"].currentIndex()
+                # # min_max_scaling
+                # if 0 == ufdci:
+                #     new_data = min_max_scaling(
+                #         masked_data,
+                #         dtype=DATATYPES[data_type]["numpy"],
+                #     )
+                #     did_any = True
+                # # max_min_scaling
+                # elif 1 == ufdci:
+                #     new_data = max_min_scaling(
+                #         masked_data,
+                #         dtype=DATATYPES[data_type]["numpy"],
+                #     )
+                #     did_any = True
+                # # bi_piecewise_linear_values
+                # elif 2 == ufdci:
+                #     a = dlg_row["a_spinbox"].value()
+                #     b = dlg_row["b_spinbox"].value()
+                #     log_row["min"] = a
+                #     log_row["max"] = b
+                #     if a != b:
+                #         new_data = bi_piecewise_linear_values(
+                #             masked_data,
+                #             a,
+                #             b,
+                #         )
+                #         did_any = True
+                #     else:
+                #         qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
+                #         log_row["skip"] = True
+                #         continue
+                # # bi_piecewise_linear_percentage
+                # elif 3 == ufdci:
+                #     c = dlg_row["c_spinbox"].value()
+                #     d = dlg_row["d_spinbox"].value()
+                #     log_row["min"] = c
+                #     log_row["max"] = d
+                #     if c != d:
+                #         new_data = bi_piecewise_linear_percentage(
+                #             masked_data,
+                #             c,
+                #             d,
+                #         )
+                #         did_any = True
+                #     else:
+                #         qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
+                #         log_row["skip"] = True
+                #         continue
+                # elif 4 == ufdci:
+                #     e = dlg_row["e_spinbox"].value()
+                #     new_data = step_up_function_values(masked_data, e)
+                #     did_any = True
+                #     log_row["threshold"] = e
+                # elif 5 == ufdci:
+                #     f = dlg_row["f_spinbox"].value()
+                #     new_data = step_up_function_percentage(masked_data, f)
+                #     did_any = True
+                #     log_row["threshold"] = f
+                # elif 6 == ufdci:
+                #     g = dlg_row["g_spinbox"].value()
+                #     new_data = step_down_function(masked_data, g)
+                #     did_any = True
+                #     log_row["threshold"] = g
+                # elif 7 == ufdci:
+                #     h = dlg_row["h_spinbox"].value()
+                #     new_data = step_down_function_percentage(masked_data, h)
+                #     did_any = True
+                #     log_row["threshold"] = h
+                # else:
+                #     from qgis.core import QgsException
+
+                #     raise QgsException(f"Utility function at index:{ufdci} not implemented")
+
+                # valid = 1 - masked_data.mask.sum() / np.prod(masked_data.shape)
+                # qprint(f"layer: {lyr_name},\tshape:{new_data.shape},\tvalid:{valid:.2%}")
+                # qprint(f"\t result histogram: {np.histogram(new_data,np.arange(0,1.1,0.1))}")
+                # final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
                 log_instance_params += [log_row]
 
             if not did_any:
                 qprint("Nothing to do, all layers unselected or 0 weight")
                 return
 
-            final_data[lyr_data == lyr_nodata] = -1
+            # final_data[lyr_data == lyr_nodata] = -1
 
             afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
             # name the layer as resolution, pixel size and data type, and HHMMSS
