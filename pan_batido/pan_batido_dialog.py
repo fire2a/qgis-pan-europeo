@@ -21,6 +21,12 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+ from qgis.PyQt.QtCore import pyqtRemoveInputHook
+ pyqtRemoveInputHook()
+ import pdb
+ pdb.set_trace()
+ from IPython.terminal.embed import InteractiveShellEmbed
+ InteractiveShellEmbed()()
 """
 
 from functools import partial
@@ -33,7 +39,7 @@ from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                  QHBoxLayout, QLabel, QSizePolicy, QSlider,
                                  QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
 
-from .config import DATATYPES, GRIORAS, qprint
+from .config import DATATYPES, GRIORAS, UTILITY_FUNCTIONS, qprint
 
 
 class MarraquetaDialog(QDialog):
@@ -91,18 +97,7 @@ class MarraquetaDialog(QDialog):
             ufunc_layout = QHBoxLayout()
             ufunc_dropdown = QComboBox()
             # NO REORDER:
-            ufunc_dropdown.addItems(
-                [
-                    "min-max",
-                    "max-min",
-                    "bi-piecewise-linear values",
-                    "bi-piecewise-linear percentage",
-                    "step up value",
-                    "step up percentage",
-                    "step down value",
-                    "step down percentage",
-                ]
-            )
+            ufunc_dropdown.addItems([uf["description"] for uf in UTILITY_FUNCTIONS])
             # signal for hiding/showing each parameters
             ufunc_dropdown.currentIndexChanged.connect(self.function_change)
             # add id to the dropdown
@@ -364,12 +359,6 @@ class MarraquetaDialog(QDialog):
 
     def handle_advanced_toggle(self):
         """show/hide advanced options"""
-        # from qgis.PyQt.QtCore import pyqtRemoveInputHook
-        # pyqtRemoveInputHook()
-        # import pdb
-        # pdb.set_trace()
-        # from IPython.terminal.embed import InteractiveShellEmbed
-        # InteractiveShellEmbed()()
         if self.advanced_checkbox.isChecked():
             self.target_groupbox.show()
             self.resample_title.show()
