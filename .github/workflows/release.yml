@@ -31,16 +31,14 @@ jobs:
         repository: "fire2a/fire2a-lib" 
         path: "fire2a"
         sparse-checkout: |
-          src/fire2a/raster.py
+          src/fire2a/raster/*
           src/fire2a/utils.py
         sparse-checkout-cone-mode: false
 
     - name: git archive
       run: |
          echo "Changing fire2a from installed to relative import"
-         mkdir -p pan_batido/fire2a
-         mv fire2a/src/fire2a/raster.py pan_batido/fire2a
-         mv fire2a/src/fire2a/utils.py pan_batido/fire2a
+         mv fire2a/src/fire2a pan_batido/.
          # rm -rf fire2a
          grep -Rl --include=*py "from fire2a" | tee will.change | xargs -I {} sed -i "s/^from fire2a/from .fire2a/" {}
          echo "Changed files"
