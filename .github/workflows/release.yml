@@ -1,7 +1,6 @@
 name: Create Release
 
 on:
-  pull_request:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -33,7 +32,7 @@ jobs:
 
     - name: Version bump
       run: |
-         VERSION=${{ env.RELEASE_TAG#v }}
+         VERSION=${{ env.RELEASE_TAG }}
          echo "version is ${VERSION}"
          sed -i -e "s/version=0.0.1/version=${VERSION}/" pan_batido/metadata.txt
          git add pan_batido/metadata.txt
