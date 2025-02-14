@@ -71,5 +71,6 @@ jobs:
         artifacts: "pan_batido_${{ env.RELEASE_TAG }}.zip"
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: true
+        tag: ${{ env.RELEASE_TAG }}
         name: ${{ env.RELEASE_TAG }}
         body: ${{ env.TAG_DESCRIPTION }}
