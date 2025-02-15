@@ -34,10 +34,8 @@ from pathlib import Path
 
 from qgis.core import Qgis, QgsMapLayer, QgsProject
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog,
-                                 QDialogButtonBox, QGridLayout, QGroupBox,
-                                 QHBoxLayout, QLabel, QSizePolicy, QSlider,
-                                 QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
+from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QHBoxLayout,
+                                 QLabel, QSizePolicy, QSlider, QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
 
 from .config import DATATYPES, GRIORAS, UTILITY_FUNCTIONS, qprint
 

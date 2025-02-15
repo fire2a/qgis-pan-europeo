@@ -20,27 +20,28 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+# fmt: off
+# from qgis.PyQt.QtCore import pyqtRemoveInputHook
+# pyqtRemoveInputHook()
+# from IPython.terminal.embed import InteractiveShellEmbed
+# InteractiveShellEmbed()()
+# fmt: on
 """
 import os.path
 import tempfile
 from pathlib import Path
 from tempfile import mktemp
-from time import time
 
 import numpy as np
-from fire2a.raster import (extent_to_projwin, gdal_calc_norm, gdal_calc_sum,
-                           read_raster)
+from fire2a.raster import extent_to_projwin, gdal_calc_norm, gdal_calc_sum, read_raster
 from osgeo import gdal
-from osgeo.osr import SpatialReference
-from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
-                       QgsCoordinateTransform, QgsMapLayer, QgsProject,
+from qgis.core import (Qgis, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsMapLayer, QgsProject,
                        QgsRasterLayer, QgsRectangle)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from .config import (DATATYPES, GRIORAS, UTILITY_FUNCTIONS,
-                     get_key_by_subdict_item, qprint)
+from .config import UTILITY_FUNCTIONS, qprint
 # Import the code for the dialog
 from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
@@ -79,6 +80,8 @@ class Marraqueta:
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
         self.common_extent = None
+        self.map_extent = None
+        self.selected_extent = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -175,21 +178,50 @@ class Marraqueta:
         self.add_action(
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )
-
-        # self.mc = self.iface.mapCanvas()
-        # self.mc.scaleChanged.connect(self.handle_scale_change)
-
         # will be set False in run()
         self.first_start = True
 
-    # def handle_scale_change(self, x):
-    #     msg = ""
-    #     if layer := self.iface.activeLayer():
-    #         extent = self.iface.mapCanvas().extent()
-    #         xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
-    #         ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
-    #         msg += f"{xsize=},\t{ysize=}"
-    #     qprint(f"zoom scale is {x},\t" + msg)
+    def handle_extent_change(self, *args, **kwargs):
+        # if not self.iface.mapCanvas().isDrawing():
+        #     self.map_extent = self.iface.mapCanvas().extent()
+        #     qprint(f"extent is {self.map_extent.asWktCoordinates()} {args=}, {kwargs=}")
+        self.map_extent = self.iface.mapCanvas().extent()
+        qprint(f"{self.map_extent.asWktCoordinates()=}")
+
+    def handle_selection_changed(self, layer):
+        # print(f"{self.selected_layer=}")
+        if not layer:
+            self.selected_extent = None
+            return
+        if layer.selectedFeaturesCount() == 0:
+            self.selected_extent = None
+            return
+        elif layer.selectedFeaturesCount() == 1:
+            self.selected_extent = self.selected_layer.selectedFeatures()[0].geometry().boundingBox()
+        else:
+            min_x = float("inf")
+            max_x = -float("inf")
+            min_y = float("inf")
+            max_y = -float("inf")
+
+            for feat in layer.selectedFeatures():
+                bbox = feat.geometry().boundingBox()
+                min_x = min(bbox.xMinimum(), min_x)
+                max_x = max(bbox.xMaximum(), max_x)
+                min_y = min(bbox.yMinimum(), min_y)
+                max_y = max(bbox.yMaximum(), max_y)
+
+            self.selected_extent = QgsRectangle(min_x, min_y, max_x, max_y)
+
+        # bbox = self.selected_extent
+        # vl = QgsVectorLayer("Polygon?crs=epsg:3035", "bbox", "memory")
+        # pr = vl.dataProvider()
+        # f = QgsFeature()
+        # f.setGeometry(QgsGeometry.fromRect(bbox))
+        # pr.addFeatures([f])
+        # vl.updateExtents()
+        # QgsProject.instance().addMapLayer(vl)
+        qprint(f"{self.selected_extent.asWktCoordinates()=}")
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -215,6 +247,8 @@ class Marraqueta:
                 )
                 return
             self.first_start = False
+            self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)
+            self.iface.mapCanvas().selectionChanged.connect(self.handle_selection_changed)
             self.dlg = MarraquetaDialog()
             self.lyr_data = []
             for dlg_row in self.dlg.rows:
@@ -251,13 +285,6 @@ class Marraqueta:
                     duration=5,
                 )
                 return
-            self.H = self.lyr_data[0]["info"]["RasterYSize"]
-            self.W = self.lyr_data[0]["info"]["RasterXSize"]
-            self.GT = self.lyr_data[0]["info"]["Transform"]
-            self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
-            self.srs = SpatialReference().ImportFromWkt(self.lyr_data[0]["layer"].crs().toWkt())
-            # qprint(f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}, srs:{self.srs}")
-            qprint("not checking if rasters match!", level=Qgis.Warning)
 
         # show the dialog
         self.dlg.show()
@@ -295,30 +322,9 @@ class Marraqueta:
                 qprint(f"No feature selected using from visible {extent=}")
             # qprint(f"{extent.area()=}")
 
-            # resolution calculation
-            # try the user input, else the first layer
-            if self.dlg.advanced_checkbox.isChecked():
-                ppta_x = self.dlg.resolution_x.value()
-                ppta_y = self.dlg.resolution_y.value()
-                px_size = self.dlg.pixel_size.value()
-                qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
-                resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
-                qprint(f"Advanced options, got {resolution=} (from user input unless current extent is smaller)")
-            else:
-                lyr_dic = self.dlg.rows[0]
-                lyr = self.iface.mapCanvas().layer(lyr_dic["layer_id"])
-                resx = round(extent.width() / lyr.rasterUnitsPerPixelX())
-                resy = round(extent.height() / lyr.rasterUnitsPerPixelY())
-                resolution = (resx, resy)
-                qprint(f"Basic options: got {resolution=} from first layer")
-
             # TODO variable datatypes
             data_type = self.dlg.data_type.currentText()
 
-            # here we will store the final data
-            final_data = np.zeros(resolution[::-1], dtype=DATATYPES[data_type]["numpy"])
-
-            #
             did_any = False
             log_instance_params = []
             outfiles = []
@@ -339,9 +345,7 @@ class Marraqueta:
                     )
                     weight = dlg_row["weight_spinbox"].value()
                     lyr_nodata = lyr["info"]["NoDataValue"]
-
                     ufdci = dlg_row["ufunc_dropdown"].currentIndex()
-                    # ask tempfile for a file
                     infile = lyr["layer"].publicSource()
                     method = UTILITY_FUNCTIONS[ufdci]["name"]
                     qprint(f"{ufdci=} {method=}", level=Qgis.Info)
@@ -406,6 +410,7 @@ class Marraqueta:
                         *map(str, projwin),
                         "-n",
                         str(nodata),
+                        "--",
                         *(map(str, params) if params else ""),
                     ]
                     print(cmd)
@@ -417,12 +422,6 @@ class Marraqueta:
 
                     log_instance_params += [log_row]
 
-            # from qgis.PyQt.QtCore import pyqtRemoveInputHook
-
-            # pyqtRemoveInputHook()
-            # from IPython.terminal.embed import InteractiveShellEmbed
-
-            # InteractiveShellEmbed()()
             if not did_any:
                 qprint("Nothing to do, all layers unselected or 0 weight")
                 return
@@ -430,7 +429,7 @@ class Marraqueta:
             qprint(outfiles, level=Qgis.Info)
 
             afile = mktemp(suffix=".tif")
-            cmd = ["-o", afile, "-w", *map(str, weights), "-p", *map(str, projwin), "-n", str(-9999), *outfiles]
+            cmd = ["-o", afile, "-w", *map(str, weights), "-p", *map(str, projwin), "-n", str(-9999), "--", *outfiles]
             print(cmd)
             if gdal_calc_sum.main(cmd) != 0:
                 qprint("Error processing final sum", level=Qgis.Critical)
@@ -451,191 +450,6 @@ class Marraqueta:
                     qprint(f"  {itm}", level=Qgis.Warning)
                     continue
                 qprint(f"  {itm}", level=Qgis.Success)
-
-
-def min_max_scaling(data, dtype=None):
-    if data.min() != data.max():
-        data = (data - data.min()) / (data.max() - data.min())
-    if dtype == np.uint8:
-        return np.uint8(255 * data)
-    elif dtype == np.uint16:
-        return np.uint16(65535 * data)
-    return data
-
-
-def max_min_scaling(data, dtype=None):
-    if data.min() != data.max():
-        data = (data - data.max()) / (data.max() - data.min())
-    if dtype == np.uint8:
-        return np.uint8(255 * data)
-    elif dtype == np.uint16:
-        return np.uint16(65535 * data)
-    return data
-
-
-def bi_piecewise_linear_values(data, a, b):
-    # linear scaling
-    data = (data - a) / (b - a)
-    # clip to [0, 1]
-    # TODO FIX DATATYPES? uint8, uint16 ?
-    data[data < 0] = 0
-    data[data > 1] = 1
-    return data
-
-
-def bi_piecewise_linear_percentage(data, a, b):
-    # linear scaling
-    rela_delta = data.max() - data.min() / 100
-    real_a = rela_delta * a
-    real_b = rela_delta * b
-    data = (data - real_a) / (real_b - real_a)
-    # clip to [0, 1]
-    # TODO FIX DATATYPES? uint8, uint16 ?
-    data[data < 0] = 0
-    data[data > 1] = 1
-    return data
-
-
-def step_up_function_values(data, a):
-    data[data < a] = 0
-    data[data >= a] = 1
-    return data
-
-
-def step_up_function_percentage(data, a):
-    rela_delta = data.max() - data.min() / 100
-    real_a = rela_delta * a
-    data[data < real_a] = 0
-    data[data >= real_a] = 1
-    return data
-
-
-def step_down_function_values(data, a):
-    data[data > a] = 0
-    data[data <= a] = 1
-    return data
-
-
-def step_down_function_percentage(data, a):
-    rela_delta = data.max() - data.min() / 100
-    real_a = rela_delta * a
-    data[data > real_a] = 0
-    data[data <= real_a] = 1
-    return data
-
-
-def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0, gdt=7, layer_name=""):
-    """Returns the data of the raster in the form of a numpy array, taken from the extent of the map canvas and resampled to resolution
-    Args:
-        raster_path (str): path to the raster file
-        extent (QgsRectangle): extent of the map canvas
-        resolution (tuple): resolution of the output array, defaults to 1920x1080
-        griora (int): gdal resampling interpolation raster algorithm, defaults to nearest neighbour
-        gdt (int): gdal data type, defaults to float64
-    Return:
-        data (np.array): numpy array with the data of the raster
-        extent (QgsRectangle): extent of the map canvas
-        srs (osgeo.osr.SpatialReference): spatial reference of the raster
-    Raises:
-        ValueError: if the raster file could not be opened by gdal.Open
-
-    Debug:
-        from osgeo import gdal
-        raster_path = iface.activeLayer().publicSource()
-        extent = iface.mapCanvas().extent()
-        resolution = (20, 80)
-        resolution = (1920, 1080)
-        griora=0
-        gdt=7
-    """
-    qprint(
-        f"layer={layer_name}, {extent=}, {resolution=}, griora={list(GRIORAS.keys())[griora]}, datatype={get_key_by_subdict_item(DATATYPES,'gdal',gdt)}, {raster_path=}"
-    )
-    dataset = gdal.Open(raster_path)
-    if dataset is None:
-        raise ValueError("Could not open raster file")
-    srs = SpatialReference()
-    if 0 != srs.ImportFromWkt(dataset.GetProjection()):
-        qprint(f"SpatialReference ImportFromWkt failed {raster_path=} (maybe raster without CRS?)", level=Qgis.Critical)
-    geotransform = dataset.GetGeoTransform()
-    # print(f"{srs=}, {geotransform=}")
-    band = dataset.GetRasterBand(1)
-    # TODO: can we use the overview to speed up the process?
-    # num_overviews = band.GetOverviewCount()
-    # TODO: test raster rotado
-    xoff = int((extent.xMinimum() - geotransform[0]) / geotransform[1])
-    yoff = int((extent.yMaximum() - geotransform[3]) / geotransform[5])
-    xsize = int((extent.xMaximum() - extent.xMinimum()) / geotransform[1])
-    ysize = int((extent.yMinimum() - extent.yMaximum()) / geotransform[5])
-    # print(f"{xoff=} {yoff=} {xsize=} {ysize=}")
-    if griora:
-        data = band.ReadAsArray(
-            xoff=xoff,
-            yoff=yoff,
-            win_xsize=xsize,
-            win_ysize=ysize,
-            buf_xsize=resolution[0],
-            buf_ysize=resolution[1],
-            resample_alg=griora,
-            buf_type=gdt,
-            # callback=partial(progress_callback, layer_name=layer_name),
-        )
-    else:
-        progress_callback = ProgressCallback()
-        data = band.ReadAsArray(
-            xoff=xoff,
-            yoff=yoff,
-            win_xsize=xsize,
-            win_ysize=ysize,
-            buf_xsize=resolution[0],
-            buf_ysize=resolution[1],
-            buf_type=gdt,
-            callback=progress_callback,
-            callback_data=layer_name,
-        )
-    """
-    ret_array = band1.ReadAsArray(
-        xoff=xoff, yoff=yoff, win_xsize=xsize, win_ysize=ysize, buf_xsize=buf_xsize, buf_ysize=buf_ysize, buf_type=gdal.GDT_Float32
-    )
-    buf_type = 256 levels (0-255) is gdal.GDT_Byte
-    resample_alg = 0 nearest neighbour, ...
-    band1.ReadAsArray(xoff=0, yoff=0, xsize=None, ysize=None, buf_obj=None, buf_xsize=None, buf_ysize=None, buf_type=None, resample_alg=0, callback=None, callback_data=None, interleave='band', band_list=None)
-    print(ret_array.shape, ret_array.dtype)
-    tmp_data  = ret_array
-    final_data = tmp_data
-    """
-    return data, srs
-
-
-def create_sampled_raster(data, extent, srs, resolution, gdt=7, *args, **kwargs):
-    """Create a new layer form numpy array data"""
-    # TODO: carry nodata value
-    afile = tempfile.mktemp(suffix=".tif")
-    dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdt)
-
-    new_geotransform = (
-        extent.xMinimum(),
-        (extent.xMaximum() - extent.xMinimum()) / resolution[0],
-        0,  # TODO: ALLOW ROTATION
-        extent.yMaximum(),
-        0,  # TODO: ALLOW ROTATION
-        (extent.yMinimum() - extent.yMaximum()) / resolution[1],
-    )
-    dataset.SetGeoTransform(new_geotransform)  # specify coords
-    dataset.SetProjection(srs.ExportToWkt())  # export coords to file
-
-    band = dataset.GetRasterBand(1)
-    if 0 != band.SetNoDataValue(-1):
-        qprint("Set No Data failed", level=Qgis.Critical)
-    if 0 != band.WriteArray(data):
-        qprint("WriteArray failed", level=Qgis.Critical)
-
-    band_paint(band)
-
-    dataset.FlushCache()  # write to disk
-    dataset = None
-    # iface.addRasterLayer(afile, "final_data")
-    return afile
 
 
 def get_colormap(num_colors: int, colormap: str = "turbo") -> list:
@@ -674,10 +488,8 @@ def band_paint(band: gdal.Band) -> None:
 
 
 def qgis_paint(layer: QgsRasterLayer):
-
     from PyQt5.QtGui import QColor
-    from qgis.core import (QgsColorRampShader, QgsRasterShader,
-                           QgsSingleBandPseudoColorRenderer)
+    from qgis.core import QgsColorRampShader, QgsRasterShader, QgsSingleBandPseudoColorRenderer
 
     num_colors = 10
     colors = get_colormap(num_colors)
@@ -743,36 +555,3 @@ def current_displayed_pixels(iface):
     xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x)
     ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y)
     return xsize, ysize
-
-
-# basic callback function
-# def progress_callback(pct, message, data, layer_name=""):
-#     # format pct as percetage
-#     qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
-#     return 1  # Return 1 to continue processing, or 0 to cancel
-
-# callback that prints only when the percentage changes
-# class ProgressCallback:
-#     def __init__(self, delta_pct=0.1):
-#         self.delta_pct = delta_pct
-#         self.last = 0
-#
-#     def __call__(self, pct, message, data, layer_name=""):
-#         if pct - self.last > self.delta_pct:
-#             qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
-#             self.last = pct
-#         return 1
-
-
-# callback that prints only when time between calls is greater than wait[seconds]
-class ProgressCallback:
-    def __init__(self, wait=1):
-        self.wait = wait
-        self.last = 0
-
-    def __call__(self, pct, message, data, *args, **kwargs):
-        now = time()
-        if now - self.last > self.wait:
-            qprint(f"  progress on {data} layer: {pct:.2%}")
-            self.last = now
-        return 1
