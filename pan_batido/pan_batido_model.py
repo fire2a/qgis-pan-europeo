@@ -1,6 +1,8 @@
 from copy import deepcopy
+from math import ceil, floor
 from pathlib import Path
 
+from fire2a.raster import read_raster
 from qgis.core import QgsProject, QgsRasterLayer
 
 UTILITY_FUNCTIONS = [
@@ -54,6 +56,7 @@ class RasterModel:
         self.weights = {}
         self.visibility = {}
         self.deleted = {}
+        self.info = {}
 
     def clear_rasters(self):
         """Clear the model."""
@@ -63,6 +66,7 @@ class RasterModel:
         self.weights = {}
         self.visibility = {}
         self.deleted = {}
+        self.info = {}
 
     def load_rasters(self):
         """Update the list of rasters from the current QGIS project."""
@@ -77,6 +81,9 @@ class RasterModel:
             }
             self.current_utility_function[raster_name] = None
             self.weights[raster_name] = 1
+            self.info[raster_name] = read_raster(raster.publicSource(), data=False, info=True)[1]
+            self.info[raster_name]["path"] = raster.publicSource()
+            self.update_params_range(raster_name, self.info[raster_name]["Minimum"], self.info[raster_name]["Maximum"])
             self.visibility[raster_name] = QgsProject.instance().layerTreeRoot().findLayer(raster.id()).isVisible()
 
     def update_rasters(self):
@@ -98,6 +105,9 @@ class RasterModel:
             }
             self.current_utility_function[raster_name] = None
             self.weights[raster_name] = 1
+            self.info[raster_name] = read_raster(raster.publicSource(), data=False, info=True)[1]
+            self.info[raster_name]["path"] = raster.publicSource()
+            self.update_params_range(raster_name, self.info[raster_name]["Minimum"], self.info[raster_name]["Maximum"])
 
         for raster_name in self.rasters:
             if raster_name in [r.name() for r in map_layers.values()]:
@@ -107,6 +117,18 @@ class RasterModel:
                 self.set_raster_deleted(raster_name, False)
             else:
                 self.set_raster_deleted(raster_name, True)
+
+    def update_params_range(self, raster_name, min_value, max_value):
+        """Update the range of a parameter for a utility function."""
+        for func in self.utility_functions:
+            if "percent" in func["name"]:
+                continue
+            if params := self.get_raster_params(raster_name, func["name"]):
+                for param in params.values():
+                    param["min"] = floor(min_value)
+                    param["max"] = ceil(max_value)
+                    param["value"] = max(min(param["value"], param["max"]), param["min"])
+                self.set_raster_params(raster_name, func["name"], params)
 
     def get_rasters(self):
         """Get the list of rasters."""
