@@ -47,7 +47,7 @@ UTILITY_FUNCTIONS = [
 ]
 
 
-class RasterModel:
+class PanRasters:
     def __init__(self):
         self.rasters = {}
         self.utility_functions = UTILITY_FUNCTIONS

@@ -36,7 +36,7 @@ from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import Qt, QUrl
 from qgis.PyQt.QtGui import QDesktopServices
 
-from ..models.pan_batido_model import RasterModel
+from ..models.pan_rasters import PanRasters
 from ..views.param_widget import ParamWidget
 from ..views.param_widget_list import ParamWidgetList
 
@@ -63,7 +63,7 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Reset).clicked.connect(self.reset)
 
         # Initialize the model
-        self.model = RasterModel()
+        self.model = PanRasters()
 
         # Populate the UI with rasters and utility functions
         self.populate_rasters()
