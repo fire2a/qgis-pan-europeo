@@ -1,8 +1,11 @@
+#!python
 from qgis.PyQt import QtCore, QtWidgets
+
+from .double_slider import DoubleSlider
 
 
 class ParamWidget(QtWidgets.QWidget):
-    valueChanged = QtCore.pyqtSignal(int)
+    valueChanged = QtCore.pyqtSignal(float)
 
     def __init__(self, label_text="", min=0, max=100, value=50, parent=None):
         super(ParamWidget, self).__init__(parent)
@@ -10,11 +13,11 @@ class ParamWidget(QtWidgets.QWidget):
         self.layout = QtWidgets.QHBoxLayout(self)
 
         self.label = QtWidgets.QLabel(label_text)
-        self.spinbox = QtWidgets.QSpinBox()
+        self.spinbox = QtWidgets.QDoubleSpinBox()
         self.spinbox.setRange(min, max)
         self.spinbox.setValue(value)
 
-        self.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.slider = DoubleSlider(orientation=QtCore.Qt.Horizontal, parent=parent)
         self.slider.setRange(min, max)
         self.slider.setValue(value)
 
@@ -22,7 +25,7 @@ class ParamWidget(QtWidgets.QWidget):
         self.layout.addWidget(self.spinbox)
         self.layout.addWidget(self.slider)
 
-        self.slider.valueChanged.connect(self.spinbox.setValue)
+        self.slider.doubleValueChanged.connect(self.spinbox.setValue)
         self.spinbox.valueChanged.connect(self.slider.setValue)
         self.spinbox.valueChanged.connect(self.valueChanged.emit)
 
