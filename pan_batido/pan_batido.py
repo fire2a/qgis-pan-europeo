@@ -33,10 +33,10 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-# Import the code for the dialog
-from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
+# Import the code for the dialog
+from .views.pan_batido_dialog import MarraquetaDialog
 
 
 class Marraqueta:

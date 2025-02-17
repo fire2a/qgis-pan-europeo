@@ -36,9 +36,9 @@ from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import Qt, QUrl
 from qgis.PyQt.QtGui import QDesktopServices
 
-from .pan_batido_model import RasterModel
-from .param_widget import ParamWidget
-from .param_widget_list import ParamWidgetList
+from ..models.pan_batido_model import RasterModel
+from ..views.param_widget import ParamWidget
+from ..views.param_widget_list import ParamWidgetList
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "pan_batido_dialog_base.ui"))
