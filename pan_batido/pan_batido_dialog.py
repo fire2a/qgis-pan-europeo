@@ -29,362 +29,145 @@
  InteractiveShellEmbed()()
 """
 
+import os
 from functools import partial
-from pathlib import Path
 
-from qgis.core import Qgis, QgsMapLayer, QgsProject
-from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QHBoxLayout,
-                                 QLabel, QSizePolicy, QSlider, QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
+from qgis.PyQt import QtWidgets, uic
+from qgis.PyQt.QtCore import Qt, QUrl
+from qgis.PyQt.QtGui import QDesktopServices
 
-from .config import DATATYPES, GRIORAS, UTILITY_FUNCTIONS, qprint
+from .pan_batido_model import RasterModel
+from .param_widget import ParamWidget
+from .param_widget_list import ParamWidgetList
+
+# This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
+FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "pan_batido_dialog_base.ui"))
 
 
-class MarraquetaDialog(QDialog):
+class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
     def __init__(self, parent=None):
         """Constructor."""
         super(MarraquetaDialog, self).__init__(parent)
-        qprint("MarraquetaDialog.__init__")
-        # set window title to Pan Europeo
-        self.setWindowTitle("Pan Europeo Baguette Marraqueta Coliza Hallulla")
-        self.verticalLayout = QVBoxLayout()
-        self.setLayout(self.verticalLayout)
+        # Set up the user interface from Designer through FORM_CLASS.
+        self.setupUi(self)
 
-        # each row is a name | weight | resample | utility function
-        self.input_groupbox = QGroupBox("Input rasters")
-        self.grid = QGridLayout()
-        self.grid.addWidget(QLabel("name"), 0, 0)
-        self.grid.addWidget(QLabel("weight"), 0, 1)
-        self.resample_title = QLabel("resample/interpolation algo.")
-        self.grid.addWidget(self.resample_title, 0, 2)
-        self.grid.addWidget(QLabel("utility func."), 0, 3)
+        # Set up columns for treeWidget
+        self.treeWidget.setColumnCount(4)
+        self.treeWidget.setHeaderLabels(["Raster Name", "Weight", "Utility Function", "Parameters"])
 
-        # for each layer a row of controls
-        self.rows = []
-        i = 0
-        for lid, layer in QgsProject.instance().mapLayers().items():
-            # qprint(f"layer {layer.name()}")
-            if layer.type() != QgsMapLayer.RasterLayer:
-                continue
-            if layer.publicSource() == "" or not Path(layer.publicSource()).is_file():
-                qprint(
-                    f"raster layer {layer.name()} has no public source, skipping (is it written locally?)",
-                    level=Qgis.Warning,
-                )
-                continue
-            # name
-            self.grid.addWidget(QLabel(layer.name()), i + 1, 0)
-            # weight
-            weight_layout = QHBoxLayout()
-            checkbox = QCheckBox()
-            spinbox = QSpinBox()
-            slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(spinbox, slider)
-            spinbox.setValue(1)
-            weight_layout.addWidget(checkbox)
-            weight_layout.addWidget(spinbox)
-            weight_layout.addWidget(slider)
-            self.grid.addLayout(weight_layout, i + 1, 1)
-            # resample
-            resample_dropdown = QComboBox()
-            # NO REORDER:
-            resample_dropdown.addItems(list(GRIORAS.keys()))
-            resample_dropdown.row_id = i
-            self.grid.addWidget(resample_dropdown, i + 1, 2)
-            # utility function
-            ufunc_layout = QHBoxLayout()
-            ufunc_dropdown = QComboBox()
-            # NO REORDER:
-            ufunc_dropdown.addItems([uf["description"] for uf in UTILITY_FUNCTIONS])
-            # signal for hiding/showing each parameters
-            ufunc_dropdown.currentIndexChanged.connect(self.function_change)
-            # add id to the dropdown
-            ufunc_dropdown.row_id = i
-            ufunc_layout.addWidget(ufunc_dropdown)
+        # Connect the buttonBox
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.accept)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Close).clicked.connect(self.reject)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Help).clicked.connect(self.open_help)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.cancel_task)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Reset).clicked.connect(self.reset)
 
-            # MINMAX
-            lbl1 = QLabel("")
-            lbl1.func_id = 0
-            lbl1.row_id = i
-            ufunc_layout.addWidget(lbl1)
+        # Initialize the model
+        self.model = RasterModel()
 
-            # MAXMIN
-            lbl2 = QLabel("")
-            lbl2.func_id = 1
-            lbl2.row_id = i
-            ufunc_layout.addWidget(lbl2)
+        # Populate the UI with rasters and utility functions
+        self.populate_rasters()
 
-            # PIECEWISE-LINEAR VALUES
-            # a
-            a_spinbox = QSpinBox()
-            a_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(a_slider, a_spinbox)
-            # b
-            b_spinbox = QSpinBox()
-            b_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(b_slider, b_spinbox)
-            for elto in [a_spinbox, a_slider, b_spinbox, b_slider]:
-                elto.row_id = i
-                elto.func_id = 2
-                elto.setVisible(False)
-                ufunc_layout.addWidget(elto)
+    def populate_rasters(self):
+        """Populate the UI with the list of rasters and utility functions."""
+        # Clear existing items in the treeWidget
+        self.treeWidget.clear()
 
-            # PIECEWISE-LINEAR PERCENTAGE
-            # c
-            c_spinbox = QSpinBox()
-            c_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(c_slider, c_spinbox)
-            # d
-            d_spinbox = QSpinBox()
-            d_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(d_slider, d_spinbox)
-            for elto in [c_spinbox, c_slider, d_spinbox, d_slider]:
-                elto.row_id = i
-                elto.func_id = 3
-                elto.setVisible(False)
-                ufunc_layout.addWidget(elto)
+        utility_functions = self.model.get_utility_functions()
 
-            # STEP UP VALUE
-            # e
-            e_spinbox = QSpinBox()
-            e_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(e_slider, e_spinbox)
-            for elto in [e_spinbox, e_slider]:
-                elto.row_id = i
-                elto.func_id = 4
-                elto.setVisible(False)
-                ufunc_layout.addWidget(elto)
+        # Populate treeWidget
+        for raster_name, raster in self.model.get_rasters().items():
+            # Create a new tree widget item for each raster
+            tree_item = QtWidgets.QTreeWidgetItem(self.treeWidget)
+            tree_item.setText(0, raster_name)
+            tree_item.setCheckState(0, Qt.Checked if self.model.get_visibility(raster_name) else Qt.Unchecked)
+            # tree_item.setData(0, Qt.UserRole, raster_name)  # Store the raster name in the item
 
-            # STEP UP PERCENTAGE
-            # f
-            f_spinbox = QSpinBox()
-            f_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(f_slider, f_spinbox)
-            for elto in [f_spinbox, f_slider]:
-                elto.row_id = i
-                elto.func_id = 5
-                elto.setVisible(False)
-                ufunc_layout.addWidget(elto)
+            # Create a combo box for utility functions
+            utility_combo = QtWidgets.QComboBox()
+            for func in utility_functions:
+                utility_combo.addItem(func["description"], func["name"])
 
-            # STEP DOWN VALUE
-            # g
-            g_spinbox = QSpinBox()
-            g_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(g_slider, g_spinbox)
-            for elto in [g_spinbox, g_slider]:
-                elto.row_id = i
-                elto.func_id = 6
-                elto.setVisible(False)
-                ufunc_layout.addWidget(elto)
+            # Check if it has a utility function selected and update the combo box
+            if current_func_name := self.model.get_current_utility_function_name(raster_name):
+                index = utility_combo.findData(current_func_name)
+                if index != -1:
+                    utility_combo.setCurrentIndex(index)
 
-            # STEP DOWN PERCENTAGE
-            # h
-            h_spinbox = QSpinBox()
-            h_slider = QSlider(Qt.Orientation.Horizontal)
-            link_spinbox_slider(h_slider, h_spinbox)
-            for elto in [h_spinbox, h_slider]:
-                elto.row_id = i
-                elto.func_id = 7
-                elto.setVisible(False)
-                ufunc_layout.addWidget(elto)
+            # Connect the signal after setting the current index
+            utility_combo.currentIndexChanged.connect(
+                partial(self.on_utility_function_changed, tree_item=tree_item, combo=utility_combo)
+            )
 
-            checkbox.setChecked(True)
-            checkbox.stateChanged.connect(
+            # Add the combo box to the tree widget item
+            self.treeWidget.setItemWidget(tree_item, 2, utility_combo)
+
+            # Add ParamWidget for weight
+            weight_widget = ParamWidget(value=self.model.get_weight(raster_name))
+            weight_widget.valueChanged.connect(
+                lambda value, raster_name=raster_name: self.update_weight(raster_name, value)
+            )
+            self.treeWidget.setItemWidget(tree_item, 1, weight_widget)
+
+            # Trigger the utility function change to add the correct number of ParamWidgets
+            self.on_utility_function_changed(utility_combo.currentIndex(), utility_combo, tree_item)
+
+    def on_utility_function_changed(self, index, combo, tree_item):
+        """Handle utility function selection change."""
+        selected_function = combo.itemData(index)
+        if selected_function is None:
+            raise ValueError("Selected function is None")
+
+        # Clear existing parameter widgets
+        if self.treeWidget.itemWidget(tree_item, 3):
+            self.treeWidget.removeItemWidget(tree_item, 3)
+
+        # Retrieve the raster name from the tree_text
+        # raster_name = tree_item.data(0, Qt.UserRole)
+        raster_name = tree_item.text(0)
+
+        # Restore previous values from the model
+        params = self.model.get_raster_params(raster_name, selected_function)
+
+        # Add new ParamWidgetList
+        param_widget_list = ParamWidgetList(params)
+        self.treeWidget.setItemWidget(tree_item, 3, param_widget_list)
+
+        # Connect signals to update the model
+        for param_name, param_widget in zip(params.keys(), param_widget_list.param_widgets):
+            param_widget.valueChanged.connect(
                 partial(
-                    set_enabled,
-                    spinbox,
-                    slider,
-                    resample_dropdown,
-                    ufunc_dropdown,
-                    a_spinbox,
-                    a_slider,
-                    b_spinbox,
-                    b_slider,
-                    c_spinbox,
-                    c_slider,
-                    d_spinbox,
-                    d_slider,
-                    e_spinbox,
-                    e_slider,
-                    f_spinbox,
-                    f_slider,
-                    g_spinbox,
-                    g_slider,
-                    h_slider,
-                    h_spinbox,
+                    self.update_param_value,
+                    raster_name=raster_name,
+                    func=selected_function,
+                    param_name=param_name,
                 )
             )
-            if QgsProject.instance().layerTreeRoot().findLayer(lid).isVisible():
-                # qprint(f"layer {layer.name()} is visible")
-                checkbox.setChecked(True)
-            else:
-                # qprint(f"layer {layer.name()} is NOT visible")
-                checkbox.setChecked(False)
 
-            self.grid.addLayout(ufunc_layout, i + 1, 3)
-            self.rows += [
-                {
-                    "i": len(self.rows),
-                    "layer_id": layer.id(),
-                    "weight_checkbox": checkbox,
-                    "weight_spinbox": spinbox,
-                    "weight_slider": slider,
-                    "resample_dropdown": resample_dropdown,
-                    "ufunc_dropdown": ufunc_dropdown,
-                    "a_spinbox": a_spinbox,
-                    "a_slider": a_slider,
-                    "b_spinbox": b_spinbox,
-                    "b_slider": b_slider,
-                    "c_spinbox": c_spinbox,
-                    "c_slider": c_slider,
-                    "d_spinbox": d_spinbox,
-                    "d_slider": d_slider,
-                    "e_spinbox": e_spinbox,
-                    "e_slider": e_slider,
-                    "f_spinbox": f_spinbox,
-                    "f_slider": f_slider,
-                    "g_spinbox": g_spinbox,
-                    "g_slider": g_slider,
-                    "h_spinbox": h_spinbox,
-                    "h_slider": h_slider,
-                }
-            ]
-            i += 1
-            qprint(f"layer {layer.name()} added", level=Qgis.Success)
+        # Update the current utility function in the model
+        self.model.set_current_utility_function_name(raster_name, selected_function)
 
-        self.input_groupbox.setLayout(self.grid)
-        self.verticalLayout.addWidget(self.input_groupbox)
+    def update_weight(self, raster_name, value):
+        """Update the weight of a raster in the model."""
+        self.model.set_weight(raster_name, value)
 
-        self.verticalLayout.addItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
+    def update_param_value(self, value, raster_name, func, param_name):
+        """Update a parameter of a raster and utility function in the model."""
+        print(f"update_param_value: {param_name=} {value=} {func=} {raster_name=}")
+        params = self.model.get_raster_params(raster_name, func)
+        params[param_name]["value"] = value
+        self.model.set_raster_params(raster_name, func, params)
 
-        # target resolution x,y; pixel size, data type
-        self.target_groupbox = QGroupBox("Output configuration")
-        self.target_layout = QGridLayout()
-        self.target_layout.addWidget(QLabel("width [px]:"), 0, 0)
-        self.resolution_x = QSpinBox()
-        self.resolution_x.setRange(1, 2147483647)
-        self.resolution_x.setValue(1920)
-        self.target_layout.addWidget(self.resolution_x, 0, 1)
-        self.target_layout.addWidget(QLabel("height [px]:"), 1, 0)
-        self.resolution_y = QSpinBox()
-        self.resolution_y.setRange(1, 2147483647)
-        self.resolution_y.setValue(1080)
-        self.target_layout.addWidget(self.resolution_y, 1, 1)
-        self.target_layout.addWidget(QLabel("pixel size [m]:"), 0, 2)
-        self.pixel_size = QSpinBox()
-        self.pixel_size.setRange(1, 2147483647)
-        self.pixel_size.setValue(100)
-        self.target_layout.addWidget(self.pixel_size, 0, 3)
-        self.target_layout.addWidget(QLabel("data type:"), 1, 2)
-        self.data_type = QComboBox()
-        self.data_type.addItems(list(DATATYPES.keys()))
-        self.data_type.setCurrentIndex(2)
-        self.target_layout.addWidget(self.data_type, 1, 3)
-        self.target_groupbox.setLayout(self.target_layout)
-        self.verticalLayout.addWidget(self.target_groupbox)
+    def open_help(self):
+        """Open the help documentation."""
+        QDesktopServices.openUrl(QUrl("https://www.github.com/fire2a"))
 
-        # add a QtButtonBox to the bottom of the dialog with Ok, and Cancel
-        self.buttonBox = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Close | QDialogButtonBox.Reset,
-        )
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-        for button in self.buttonBox.buttons():
-            if button.text() == "Reset":
-                button.clicked.connect(self.reset)
-
-        hl = QHBoxLayout()
-        label = QLabel()
-        label.setText('<a href="https://fire2a.github.io/qgis-pan-europeo/">user manual</a>')
-        label.setOpenExternalLinks(True)
-        label.setAlignment(Qt.AlignLeft)
-        hl.addWidget(label)
-
-        self.advanced_checkbox = QCheckBox("Advanced options")
-        self.target_groupbox.hide()
-        self.resample_title.hide()
-        for r in self.rows:
-            r["resample_dropdown"].hide()
-        self.advanced_checkbox.stateChanged.connect(self.handle_advanced_toggle)
-        hl.addWidget(self.advanced_checkbox)
-
-        label = QLabel()
-        label.setText('<a href="https://github.com/fire2a/qgis-pan-europeo/issues">issues</a>')
-        label.setOpenExternalLinks(True)
-        label.setAlignment(Qt.AlignRight)
-        hl.addWidget(label)
-        self.verticalLayout.addLayout(hl)
-
-        self.verticalLayout.addWidget(self.buttonBox)
-        # self.setupUi(self) not using QtDesigner
-
-    def reject(self):
-        self.destroy()
+    def cancel_task(self):
+        """Handle the cancel button to stop a long-running task."""
+        print("Cancel button pressed. Stopping the task...")
+        # Add logic to stop the long-running task here
 
     def reset(self):
-        self.destroy()
-        self.__init__(self.parent())
-
-    def rescale_weights(self):
-        """all inputs should sum to 100"""
-        accum_weight = 0
-        for row in self.rows:
-            checkbox, spinbox = row["weight_checkbox"], row["weight_spinbox"]
-            if checkbox.isChecked():
-                accum_weight += spinbox.value()
-        if accum_weight != 100 and accum_weight != 0:
-            for row in self.rows:
-                spinbox = row["weight_spinbox"]
-                spinbox.setValue(int(spinbox.value() * 100 / accum_weight))
-
-    def function_change(self, idx):
-        """make visible row a_spinbox, a_slider, b_spinbox, b_slider if index !=0"""
-        # def function_change(self, *args, **kwargs):
-        # QgsMessageLog.logMessage(f"{args=}, {kwargs=}", "Marraqueta")
-        # args=(1,), kwargs={}
-        # qprint(f"dropdown {idx=} {self.sender().row_id=}")
-        # identify row
-        row = self.rows[self.sender().row_id]
-        # iterate over func_id elements
-        for elto in row.values():
-            if not isinstance(elto, QWidget):
-                continue
-            if hasattr(elto, "func_id"):
-                if elto.func_id == idx:
-                    elto.setVisible(True)
-                else:
-                    elto.setVisible(False)
-
-    def handle_advanced_toggle(self):
-        """show/hide advanced options"""
-        if self.advanced_checkbox.isChecked():
-            self.target_groupbox.show()
-            self.resample_title.show()
-            for r in self.rows:
-                r["resample_dropdown"].show()
-        else:
-            self.target_groupbox.hide()
-            self.resample_title.hide()
-            for r in self.rows:
-                r["resample_dropdown"].hide()
-
-
-def link_spinbox_slider(slider, spinbox):
-    """Link a QSpinBox, QSlider"""
-    spinbox.setRange(0, 100)
-    slider.setRange(0, 100)
-
-    def set_spinbox_value(value):
-        spinbox.setValue(value)
-
-    def set_slider_value(value):
-        slider.setValue(value)
-
-    spinbox.valueChanged.connect(set_slider_value)
-    slider.valueChanged.connect(set_spinbox_value)
-
-
-def set_enabled(*args):
-    value = args[-1]
-    for widget in args[:-1]:
-        widget.setEnabled(value)
+        """Reset the model to its initial state."""
+        self.model.clear_rasters()
+        self.populate_rasters()

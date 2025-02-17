@@ -6,89 +6,114 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>354</width>
-    <height>384</height>
+    <width>649</width>
+    <height>568</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Pan Europeo</string>
   </property>
-  <widget class="QWidget" name="verticalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>10</y>
-     <width>311</width>
-     <height>361</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <item>
-     <widget class="QGroupBox" name="groupBox">
-      <property name="title">
-       <string>Input rasters</string>
-      </property>
-      <widget class="QWidget" name="verticalLayoutWidget_2">
-       <property name="geometry">
-        <rect>
-         <x>19</x>
-         <y>29</y>
-         <width>271</width>
-         <height>121</height>
-        </rect>
-       </property>
-       <layout class="QVBoxLayout" name="verticalLayout_2"/>
-      </widget>
-     </widget>
-    </item>
-    <item>
-     <widget class="QGroupBox" name="groupBox_2">
-      <property name="title">
-       <string>Output configuration</string>
-      </property>
-      <widget class="QWidget" name="verticalLayoutWidget_3">
-       <property name="geometry">
-        <rect>
-         <x>19</x>
-         <y>29</y>
-         <width>271</width>
-         <height>111</height>
-        </rect>
-       </property>
-       <layout class="QVBoxLayout" name="verticalLayout_3">
-        <item>
-         <widget class="QgsCheckableComboBox" name="mComboBox"/>
-        </item>
-        <item>
-         <widget class="QgsMapLayerComboBox" name="mMapLayerComboBox"/>
-        </item>
-        <item>
-         <widget class="QComboBox" name="comboBox"/>
-        </item>
-       </layout>
-      </widget>
-     </widget>
-    </item>
-    <item>
-     <widget class="QDialogButtonBox" name="buttonBox">
-      <property name="standardButtons">
-       <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Input rasters</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QTreeWidget" name="treeWidget">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="columnCount">
+         <number>4</number>
+        </property>
+        <column>
+         <property name="text">
+          <string notr="true">1</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string notr="true">2</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string notr="true">3</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string notr="true">4</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QgsCollapsibleGroupBox" name="mGroupBox">
+     <property name="title">
+      <string>Output configuration</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>NoDataValue</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>DataType</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QgsDoubleSpinBox" name="mQgsDoubleSpinBox"/>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="comboBox"/>
+      </item>
+      <item row="2" column="1">
+       <widget class="QgsExtentGroupBox" name="mExtentGroupBox"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Close|QDialogButtonBox::Help|QDialogButtonBox::Ok|QDialogButtonBox::Reset</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <customwidgets>
   <customwidget>
-   <class>QgsCheckableComboBox</class>
-   <extends>QComboBox</extends>
-   <header>qgscheckablecombobox.h</header>
+   <class>QgsCollapsibleGroupBox</class>
+   <extends>QGroupBox</extends>
+   <header>qgscollapsiblegroupbox.h</header>
+   <container>1</container>
   </customwidget>
   <customwidget>
-   <class>QgsMapLayerComboBox</class>
-   <extends>QComboBox</extends>
-   <header>qgsmaplayercombobox.h</header>
+   <class>QgsDoubleSpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header>qgsdoublespinbox.h</header>
+  </customwidget>
+  <customwidget>
+   <class>QgsExtentGroupBox</class>
+   <extends>QgsCollapsibleGroupBox</extends>
+   <header>qgsextentgroupbox.h</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>
