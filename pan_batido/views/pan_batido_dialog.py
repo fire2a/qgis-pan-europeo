@@ -21,12 +21,12 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+ # fmt: off
  from qgis.PyQt.QtCore import pyqtRemoveInputHook
  pyqtRemoveInputHook()
- import pdb
- pdb.set_trace()
  from IPython.terminal.embed import InteractiveShellEmbed
  InteractiveShellEmbed()()
+ # fmt: on
 """
 
 import os
@@ -61,12 +61,16 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Help).clicked.connect(self.open_help)
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.cancel_task)
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Reset).clicked.connect(self.reset)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.apply)
 
         # Initialize the model
         self.model = PanRasters()
 
         # Populate the UI with rasters and utility functions
         self.populate_rasters()
+
+        # Connect the itemChanged signal to a custom slot
+        self.treeWidget.itemChanged.connect(self.on_item_changed)
 
     def populate_rasters(self):
         """Populate the UI with the list of rasters and utility functions."""
@@ -158,6 +162,13 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
         params[param_name]["value"] = value
         self.model.set_raster_params(raster_name, func, params)
 
+    def on_item_changed(self, item, column):
+        """Handle item changed signal."""
+        if column == 0:  # Check state changes are in the first column
+            check_state = item.checkState(0)
+            raster_name = item.text(0)
+            self.model.set_visibility(raster_name, check_state == Qt.Checked)
+
     def open_help(self):
         """Open the help documentation."""
         QDesktopServices.openUrl(QUrl("https://www.github.com/fire2a"))
@@ -171,3 +182,16 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
         """Reset the model to its initial state."""
         self.model.clear_rasters()
         self.populate_rasters()
+
+    def apply(self):
+        """Apply the changes to the model."""
+        # balance weights
+        self.model.balance_weights()
+        root = self.treeWidget.invisibleRootItem()
+        child_count = root.childCount()
+        for i in range(child_count):
+            top_level_item = root.child(i)
+            raster_name = top_level_item.text(0)
+            weight = self.model.get_weight(raster_name)
+            weight_widget = self.treeWidget.itemWidget(top_level_item, 1)
+            weight_widget.setValue(weight)

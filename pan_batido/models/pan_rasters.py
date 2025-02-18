@@ -185,6 +185,17 @@ class PanRasters:
         """Get the weight for a raster."""
         return self.weights[raster_name]
 
+    def balance_weights(self):
+        """Balance the weights of the rasters, so the sum is 100, only for non-deleted rasters."""
+        rasters = [
+            raster_name
+            for raster_name in self.rasters
+            if not self.is_raster_deleted(raster_name) and self.get_visibility(raster_name)
+        ]
+        total = sum(self.get_weight(raster_name) for raster_name in rasters)
+        for raster_name in rasters:
+            self.set_weight(raster_name, 100 * self.get_weight(raster_name) / total)
+
     def set_visibility(self, raster_name, visible):
         """Set the visibility for a raster."""
         self.visibility[raster_name] = visible

@@ -30,3 +30,6 @@ class ParamWidget(QtWidgets.QWidget):
         self.spinbox.valueChanged.connect(self.valueChanged.emit)
 
         self.setLayout(self.layout)
+
+    def setValue(self, value):
+        self.spinbox.setValue(value)
