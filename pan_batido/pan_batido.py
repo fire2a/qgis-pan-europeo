@@ -20,28 +20,30 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+# fmt: off
+# from qgis.PyQt.QtCore import pyqtRemoveInputHook
+# pyqtRemoveInputHook()
+# from IPython.terminal.embed import InteractiveShellEmbed
+# InteractiveShellEmbed()()
+# fmt: on
 """
+import importlib
+import multiprocessing
 import os.path
-import tempfile
-from pathlib import Path
-from time import time
+import sys
+from functools import partial
+from time import sleep
 
-import numpy as np
-from fire2a.raster import read_raster
-from osgeo import gdal
-from osgeo.osr import SpatialReference
-from qgis.core import (Qgis, QgsCoordinateReferenceSystem,
-                       QgsCoordinateTransform, QgsMapLayer, QgsProject,
-                       QgsRasterLayer, QgsRectangle)
+from qgis.core import (Qgis, QgsApplication, QgsMessageLog, QgsProcessingAlgRunnerTask, QgsProcessingContext,
+                       QgsProcessingFeedback, QgsProject, QgsTask, QgsTaskManager)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from .config import DATATYPES, GRIORAS, get_key_by_subdict_item, qprint
-# Import the code for the dialog
-from .pan_batido_dialog import MarraquetaDialog
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
+# Import the code for the dialog
+from .views.pan_batido_dialog import MarraquetaDialog
 
 
 class Marraqueta:
@@ -75,7 +77,6 @@ class Marraqueta:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
-        self.common_extent = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -173,20 +174,8 @@ class Marraqueta:
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )
 
-        # self.mc = self.iface.mapCanvas()
-        # self.mc.scaleChanged.connect(self.handle_scale_change)
-
         # will be set False in run()
         self.first_start = True
-
-    # def handle_scale_change(self, x):
-    #     msg = ""
-    #     if layer := self.iface.activeLayer():
-    #         extent = self.iface.mapCanvas().extent()
-    #         xsize = int((extent.xMaximum() - extent.xMinimum()) / layer.rasterUnitsPerPixelX())
-    #         ysize = int((extent.yMinimum() - extent.yMaximum()) / layer.rasterUnitsPerPixelY())
-    #         msg += f"{xsize=},\t{ysize=}"
-    #     qprint(f"zoom scale is {x},\t" + msg)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -196,584 +185,26 @@ class Marraqueta:
 
     def run(self):
         """Run method that performs all the real work"""
-        # qprint("current layers", self.iface.mapCanvas().layers())
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
-            if len(self.iface.mapCanvas().layers()) == 0:
-                qprint("No layers loaded. Not loading the dialog!", level=Qgis.Critical)
-                # display a message in system toolbar
-                self.iface.messageBar().pushMessage(
-                    "No layers loaded",
-                    "Please load some raster layers before launching the PAN-BATIDO plugin",
-                    level=Qgis.Critical,
-                    duration=5,
-                )
-                return
             self.first_start = False
             self.dlg = MarraquetaDialog()
-            self.lyr_data = []
-            for dlg_row in self.dlg.rows:
-                # layer = self.iface.mapCanvas().layer(dlg_row["layer_id"])
-                layer = QgsProject.instance().layerTreeRoot().findLayer(dlg_row["layer_id"]).layer()
-                _, info = read_raster(layer.publicSource(), data=False, info=True)
-                self.lyr_data += [
-                    {"layer": layer, "info": info, "name": layer.name(), "extent": layer.extent(), "crs": layer.crs()}
-                ]
-                rimin, rimax = int(np.floor(info["Minimum"])), int(np.ceil(info["Maximum"]))
-                xsize, ysize = info["RasterXSize"], info["RasterYSize"]
-                qprint(
-                    f"layer name: {layer.name()}, value range ({rimin},{rimax}), size w: {xsize}, h:{ysize}, authid: {layer.crs().authid()},  id: {dlg_row['layer_id']}"
-                )
-                # set ranges for utility functions
-                for letters in ["a", "b", "e", "g"]:
-                    for wid in ["spinbox", "slider"]:
-                        name = f"{letters}_{wid}"
-                        dlg_row[name].setRange(rimin, rimax)
-            # qprint(f"{self.lyr_data=}")
-            self.common_extent = projected_extent(self.lyr_data[0]["extent"], self.lyr_data[0]["crs"])
-            # qprint(f"0 {self.common_extent=}")
-            # cc = 0
-            for lyr in self.lyr_data[1:]:
-                self.common_extent = self.common_extent.intersect(projected_extent(lyr["extent"], lyr["crs"]))
-                # qprint(f"{cc} {lyr['extent']=}, {self.common_extent=}")
-                # cc += 1
-            if self.common_extent.isEmpty():
-                qprint("No common extent between raster layers, aborting start", level=Qgis.Critical)
-                self.iface.messageBar().pushMessage(
-                    "Overlap between rasters is empty!",
-                    "Please make sure all rasters intersect PAN-BATIDO plugin and restart it",
-                    level=Qgis.Critical,
-                    duration=5,
-                )
-                return
-            self.H = self.lyr_data[0]["info"]["RasterYSize"]
-            self.W = self.lyr_data[0]["info"]["RasterXSize"]
-            self.GT = self.lyr_data[0]["info"]["Transform"]
-            self.crs_auth_id = self.lyr_data[0]["layer"].crs().authid()
-            self.srs = SpatialReference().ImportFromWkt(self.lyr_data[0]["layer"].crs().toWkt())
-            # qprint(f"H:{self.H} W:{self.W} GeoTransform:{self.GT} crs-auth-id:{self.crs_auth_id}, srs:{self.srs}")
-            qprint("not checking if rasters match!", level=Qgis.Warning)
+            print("===Dialog created===")
+        else:
+            self.dlg.populate_rasters()
 
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        # qprint(f"{result=} {self.dlg.DialogCode()=}")
         # See if OK was pressed
-        if result == 1:
-            self.dlg.rescale_weights()
-
-            # extent calculation
-            # polygon selected?
-            if lyrs_w_selection := [
-                lyr
-                for lyr in QgsProject.instance().mapLayers().values()
-                if lyr and lyr.type() == QgsMapLayer.VectorLayer and lyr.selectedFeatureCount() == 1
-            ]:
-                if len(lyrs_w_selection) > 1:
-                    qprint("Warning: more than one layer with one selected feature, using the first one")
-                lyrs_w_selection = lyrs_w_selection[0]
-                feat_bbox = lyrs_w_selection.selectedFeatures()[0].geometry().boundingBox()
-                extent = self.common_extent.intersect(projected_extent(feat_bbox, lyrs_w_selection.crs()))
-                if extent.isEmpty():
-                    qprint("No common extent between selected polygon and rasters", level=Qgis.Critical)
-                    self.iface.messageBar().pushMessage(
-                        "No overlap with area of study",
-                        "Please select make sure there's common ground",
-                        level=Qgis.Critical,
-                        duration=3,
-                    )
-                    return
-            # visible extent
-            else:
-                extent = self.common_extent.intersect(self.iface.mapCanvas().extent())
-                qprint(f"No feature selected using from visible {extent=}")
-            # qprint(f"{extent.area()=}")
-
-            # resolution calculation
-            # try the user input, else the first layer
-            if self.dlg.advanced_checkbox.isChecked():
-                ppta_x = self.dlg.resolution_x.value()
-                ppta_y = self.dlg.resolution_y.value()
-                px_size = self.dlg.pixel_size.value()
-                qprint(f"{ppta_x=}, {ppta_y=}, {px_size=}")
-                resolution = resolution_filter(extent, (ppta_x, ppta_y), pixel_size=px_size)
-                qprint(f"Advanced options, got {resolution=} (from user input unless current extent is smaller)")
-            else:
-                lyr_dic = self.dlg.rows[0]
-                lyr = self.iface.mapCanvas().layer(lyr_dic["layer_id"])
-                resx = round(extent.width() / lyr.rasterUnitsPerPixelX())
-                resy = round(extent.height() / lyr.rasterUnitsPerPixelY())
-                resolution = (resx, resy)
-                qprint(f"Basic options: got {resolution=} from first layer")
-
-            # TODO variable datatypes
-            data_type = self.dlg.data_type.currentText()
-
-            # here we will store the final data
-            final_data = np.zeros(resolution[::-1], dtype=DATATYPES[data_type]["numpy"])
-
-            #
-            did_any = False
-            log_instance_params = []
-            for dlg_row in self.dlg.rows:
-                lyr = self.lyr_data[dlg_row["i"]]
-                log_row = {
-                    "name": lyr["name"],
-                    "enabled": dlg_row["weight_checkbox"].isChecked(),
-                }
-                if dlg_row["weight_checkbox"].isChecked() and dlg_row["weight_spinbox"].value() != 0:
-                    log_row.update(
-                        {
-                            "weight": dlg_row["weight_spinbox"].value(),
-                            "utility function": dlg_row["ufunc_dropdown"].currentText(),
-                            "resample method": dlg_row["resample_dropdown"].currentText(),
-                        }
-                    )
-                    weight = dlg_row["weight_spinbox"].value()
-                    lyr_name = lyr["name"]
-                    lyr_nodata = lyr["info"]["NoDataValue"]
-                    # get data
-                    lyr_data, srs = get_sampled_raster_data(
-                        lyr["layer"].publicSource(),
-                        extent,
-                        resolution,
-                        GRIORAS[dlg_row["resample_dropdown"].currentText()],
-                        DATATYPES[data_type]["gdal"],
-                        layer_name=lyr_name,
-                    )
-                    # mask nan & nodata
-                    masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data) | (lyr_data == lyr_nodata))
-                    # masked_data = np.ma.masked_array(lyr_data, np.isnan(lyr_data))
-                    # qprint(f"{masked_data.mask.sum()=}")
-                    # utility function dropdown current index
-                    ufdci = dlg_row["ufunc_dropdown"].currentIndex()
-                    # min_max_scaling
-                    if 0 == ufdci:
-                        new_data = min_max_scaling(
-                            masked_data,
-                            dtype=DATATYPES[data_type]["numpy"],
-                        )
-                        did_any = True
-                    # max_min_scaling
-                    elif 1 == ufdci:
-                        new_data = max_min_scaling(
-                            masked_data,
-                            dtype=DATATYPES[data_type]["numpy"],
-                        )
-                        did_any = True
-                    # bi_piecewise_linear_values
-                    elif 2 == ufdci:
-                        a = dlg_row["a_spinbox"].value()
-                        b = dlg_row["b_spinbox"].value()
-                        log_row["min"] = a
-                        log_row["max"] = b
-                        if a != b:
-                            new_data = bi_piecewise_linear_values(
-                                masked_data,
-                                a,
-                                b,
-                            )
-                            did_any = True
-                        else:
-                            qprint(f"bi_piecewise_linear_values {a} == {b}, skipping", level=Qgis.Warning)
-                            log_row["skip"] = True
-                            continue
-                    # bi_piecewise_linear_percentage
-                    elif 3 == ufdci:
-                        c = dlg_row["c_spinbox"].value()
-                        d = dlg_row["d_spinbox"].value()
-                        log_row["min"] = c
-                        log_row["max"] = d
-                        if c != d:
-                            new_data = bi_piecewise_linear_percentage(
-                                masked_data,
-                                c,
-                                d,
-                            )
-                            did_any = True
-                        else:
-                            qprint(f"bi_piecewise_linear_percentage {c} == {d}, skipping", level=Qgis.Warning)
-                            log_row["skip"] = True
-                            continue
-                    elif 4 == ufdci:
-                        e = dlg_row["e_spinbox"].value()
-                        new_data = step_up_function_values(masked_data, e)
-                        did_any = True
-                        log_row["threshold"] = e
-                    elif 5 == ufdci:
-                        f = dlg_row["f_spinbox"].value()
-                        new_data = step_up_function_percentage(masked_data, f)
-                        did_any = True
-                        log_row["threshold"] = f
-                    elif 6 == ufdci:
-                        g = dlg_row["g_spinbox"].value()
-                        new_data = step_down_function_percentage(masked_data, g)
-                        did_any = True
-                        log_row["threshold"] = g
-                    elif 7 == ufdci:
-                        h = dlg_row["h_spinbox"].value()
-                        new_data = step_down_function_percentage(masked_data, h)
-                        did_any = True
-                        log_row["threshold"] = h
-                    else:
-                        from qgis.core import QgsException
-
-                        raise QgsException(f"Utility function at index:{ufdci} not implemented")
-
-                    valid = 1 - masked_data.mask.sum() / np.prod(masked_data.shape)
-                    qprint(f"layer: {lyr_name},\tshape:{new_data.shape},\tvalid:{valid:.2%}")
-                    qprint(f"\t result histogram: {np.histogram(new_data,np.arange(0,1.1,0.1))}")
-                    final_data[lyr_data != lyr_nodata] += weight / 100 * new_data[lyr_data != lyr_nodata]
-                log_instance_params += [log_row]
-
-            if not did_any:
-                qprint("Nothing to do, all layers unselected or 0 weight")
-                return
-
-            final_data[lyr_data == lyr_nodata] = -1
-
-            afile = create_sampled_raster(final_data, extent, srs, resolution, DATATYPES[data_type]["gdal"])
-            # name the layer as resolution, pixel size and data type, and HHMMSS
-            qprint(
-                f"Created {afile=}, {resolution=}, {data_type=}, by combining:",
-                level=Qgis.Success,
-            )
-            # add the raster layer to the canvas
-            layer = self.iface.addRasterLayer(afile, Path(afile).stem)
-            if data_type not in ["Byte(0-255)", "UInt16(0-65535)"]:
-                qgis_paint(layer)
-
-            log_instance_params = sorted(log_instance_params, key=lambda x: x["enabled"])
-            for itm in log_instance_params:
-                if not itm.get("enabled", False):
-                    qprint(f"  {itm}", level=Qgis.Warning)
-                    continue
-                qprint(f"  {itm}", level=Qgis.Success)
-
-
-def min_max_scaling(data, dtype=None):
-    if data.min() != data.max():
-        data = (data - data.min()) / (data.max() - data.min())
-    if dtype == np.uint8:
-        return np.uint8(255 * data)
-    elif dtype == np.uint16:
-        return np.uint16(65535 * data)
-    return data
-
-
-def max_min_scaling(data, dtype=None):
-    if data.min() != data.max():
-        data = (data - data.max()) / (data.max() - data.min())
-    if dtype == np.uint8:
-        return np.uint8(255 * data)
-    elif dtype == np.uint16:
-        return np.uint16(65535 * data)
-    return data
-
-
-def bi_piecewise_linear_values(data, a, b):
-    # linear scaling
-    data = (data - a) / (b - a)
-    # clip to [0, 1]
-    # TODO FIX DATATYPES? uint8, uint16 ?
-    data[data < 0] = 0
-    data[data > 1] = 1
-    return data
-
-
-def bi_piecewise_linear_percentage(data, a, b):
-    # linear scaling
-    rela_delta = data.max() - data.min() / 100
-    real_a = rela_delta * a
-    real_b = rela_delta * b
-    data = (data - real_a) / (real_b - real_a)
-    # clip to [0, 1]
-    # TODO FIX DATATYPES? uint8, uint16 ?
-    data[data < 0] = 0
-    data[data > 1] = 1
-    return data
-
-
-def step_up_function_values(data, a):
-    data[data < a] = 0
-    data[data >= a] = 1
-    return data
-
-
-def step_up_function_percentage(data, a):
-    rela_delta = data.max() - data.min() / 100
-    real_a = rela_delta * a
-    data[data < real_a] = 0
-    data[data >= real_a] = 1
-    return data
-
-
-def step_down_function_values(data, a):
-    data[data > a] = 0
-    data[data <= a] = 1
-    return data
-
-
-def step_down_function_percentage(data, a):
-    rela_delta = data.max() - data.min() / 100
-    real_a = rela_delta * a
-    data[data > real_a] = 0
-    data[data <= real_a] = 1
-    return data
-
-
-def get_sampled_raster_data(raster_path, extent, resolution=(1920, 1080), griora=0, gdt=7, layer_name=""):
-    """Returns the data of the raster in the form of a numpy array, taken from the extent of the map canvas and resampled to resolution
-    Args:
-        raster_path (str): path to the raster file
-        extent (QgsRectangle): extent of the map canvas
-        resolution (tuple): resolution of the output array, defaults to 1920x1080
-        griora (int): gdal resampling interpolation raster algorithm, defaults to nearest neighbour
-        gdt (int): gdal data type, defaults to float64
-    Return:
-        data (np.array): numpy array with the data of the raster
-        extent (QgsRectangle): extent of the map canvas
-        srs (osgeo.osr.SpatialReference): spatial reference of the raster
-    Raises:
-        ValueError: if the raster file could not be opened by gdal.Open
-
-    Debug:
-        from osgeo import gdal
-        raster_path = iface.activeLayer().publicSource()
-        extent = iface.mapCanvas().extent()
-        resolution = (20, 80)
-        resolution = (1920, 1080)
-        griora=0
-        gdt=7
-    """
-    qprint(
-        f"layer={layer_name}, {extent=}, {resolution=}, griora={list(GRIORAS.keys())[griora]}, datatype={get_key_by_subdict_item(DATATYPES,'gdal',gdt)}, {raster_path=}"
-    )
-    dataset = gdal.Open(raster_path)
-    if dataset is None:
-        raise ValueError("Could not open raster file")
-    srs = SpatialReference()
-    if 0 != srs.ImportFromWkt(dataset.GetProjection()):
-        qprint(f"SpatialReference ImportFromWkt failed {raster_path=} (maybe raster without CRS?)", level=Qgis.Critical)
-    geotransform = dataset.GetGeoTransform()
-    # print(f"{srs=}, {geotransform=}")
-    band = dataset.GetRasterBand(1)
-    # TODO: can we use the overview to speed up the process?
-    # num_overviews = band.GetOverviewCount()
-    # TODO: test raster rotado
-    xoff = int((extent.xMinimum() - geotransform[0]) / geotransform[1])
-    yoff = int((extent.yMaximum() - geotransform[3]) / geotransform[5])
-    xsize = int((extent.xMaximum() - extent.xMinimum()) / geotransform[1])
-    ysize = int((extent.yMinimum() - extent.yMaximum()) / geotransform[5])
-    # print(f"{xoff=} {yoff=} {xsize=} {ysize=}")
-    if griora:
-        data = band.ReadAsArray(
-            xoff=xoff,
-            yoff=yoff,
-            win_xsize=xsize,
-            win_ysize=ysize,
-            buf_xsize=resolution[0],
-            buf_ysize=resolution[1],
-            resample_alg=griora,
-            buf_type=gdt,
-            # callback=partial(progress_callback, layer_name=layer_name),
-        )
-    else:
-        progress_callback = ProgressCallback()
-        data = band.ReadAsArray(
-            xoff=xoff,
-            yoff=yoff,
-            win_xsize=xsize,
-            win_ysize=ysize,
-            buf_xsize=resolution[0],
-            buf_ysize=resolution[1],
-            buf_type=gdt,
-            callback=progress_callback,
-            callback_data=layer_name,
-        )
-    """
-    ret_array = band1.ReadAsArray(
-        xoff=xoff, yoff=yoff, win_xsize=xsize, win_ysize=ysize, buf_xsize=buf_xsize, buf_ysize=buf_ysize, buf_type=gdal.GDT_Float32
-    )
-    buf_type = 256 levels (0-255) is gdal.GDT_Byte
-    resample_alg = 0 nearest neighbour, ...
-    band1.ReadAsArray(xoff=0, yoff=0, xsize=None, ysize=None, buf_obj=None, buf_xsize=None, buf_ysize=None, buf_type=None, resample_alg=0, callback=None, callback_data=None, interleave='band', band_list=None)
-    print(ret_array.shape, ret_array.dtype)
-    tmp_data  = ret_array
-    final_data = tmp_data
-    """
-    return data, srs
-
-
-def create_sampled_raster(data, extent, srs, resolution, gdt=7, *args, **kwargs):
-    """Create a new layer form numpy array data"""
-    # TODO: carry nodata value
-    afile = tempfile.mktemp(suffix=".tif")
-    dataset = gdal.GetDriverByName("GTiff").Create(afile, data.shape[1], data.shape[0], 1, gdt)
-
-    new_geotransform = (
-        extent.xMinimum(),
-        (extent.xMaximum() - extent.xMinimum()) / resolution[0],
-        0,  # TODO: ALLOW ROTATION
-        extent.yMaximum(),
-        0,  # TODO: ALLOW ROTATION
-        (extent.yMinimum() - extent.yMaximum()) / resolution[1],
-    )
-    dataset.SetGeoTransform(new_geotransform)  # specify coords
-    dataset.SetProjection(srs.ExportToWkt())  # export coords to file
-
-    band = dataset.GetRasterBand(1)
-    if 0 != band.SetNoDataValue(-1):
-        qprint("Set No Data failed", level=Qgis.Critical)
-    if 0 != band.WriteArray(data):
-        qprint("WriteArray failed", level=Qgis.Critical)
-
-    band_paint(band)
-
-    dataset.FlushCache()  # write to disk
-    dataset = None
-    # iface.addRasterLayer(afile, "final_data")
-    return afile
-
-
-def get_colormap(num_colors: int, colormap: str = "turbo") -> list:
-    from matplotlib import colormaps
-    from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-    from numpy import linspace
-
-    cm = colormaps.get(colormap)
-    if isinstance(cm, LinearSegmentedColormap):
-        colors = cm(linspace(0, 1, num_colors))
-    elif isinstance(cm, ListedColormap):
-        colors = cm.resampled(num_colors).colors
-    return (colors * 255).astype(int)
-
-
-def band_paint(band: gdal.Band) -> None:
-    """Paints a gdal raster using band.SetRasterColorTable, only works for Byte and UInt16 bands
-    Args:
-        band (gdal.Band): band to paint
-        colormap (str): name of the colormap to use
-    """
-    if band.DataType == gdal.GDT_Byte:
-        # byte 2**8 = 256
-        num_colors = 256
-    elif band.DataType == gdal.GDT_UInt16:
-        # uint16 2**16 = 65,536
-        num_colors = 65536
-    else:
-        return
-
-    color_table = gdal.ColorTable()
-    colors = get_colormap(num_colors)
-    for i, color in enumerate(colors):
-        color_table.SetColorEntry(i, tuple(color))
-    band.SetRasterColorTable(color_table)
-
-
-def qgis_paint(layer: QgsRasterLayer):
-
-    from PyQt5.QtGui import QColor
-    from qgis.core import (QgsColorRampShader, QgsRasterShader,
-                           QgsSingleBandPseudoColorRenderer)
-
-    num_colors = 10
-    colors = get_colormap(num_colors)
-    fcn = QgsColorRampShader(minimumValue=0, maximumValue=1)
-    fcn.setColorRampType(QgsColorRampShader.Interpolated)
-    fcn.setColorRampItemList([QgsColorRampShader.ColorRampItem(0.1 * i, QColor(*clr)) for i, clr in enumerate(colors)])
-    shader = QgsRasterShader()
-    shader.setRasterShaderFunction(fcn)
-
-    band = layer.bandCount()  # Assuming you want to use the last band
-    renderer = QgsSingleBandPseudoColorRenderer(layer.dataProvider(), band, shader)
-    layer.setRenderer(renderer)
-
-    # Trigger a repaint for the layer
-    layer.triggerRepaint()
-
-
-def get_extent_size(extent: QgsRectangle):
-    """Returns the width and height of the current displayed extent in meters"""
-    # Create a CRS for meters (for example, WGS 84 / Pseudo-Mercator)
-    crs_meters = QgsCoordinateReferenceSystem("EPSG:3857")
-
-    # Get the current CRS
-    crs_current = QgsProject.instance().crs()
-
-    # Create a coordinate transform
-    transform = QgsCoordinateTransform(crs_current, crs_meters, QgsProject.instance())
-
-    # Transform the extent
-    extent_meters = transform.transformBoundingBox(extent)
-
-    # Get the width and height
-    width = extent_meters.width()
-    height = extent_meters.height()
-    qprint(f"get_extent_size  {width=}, {height=}")
-    return width, height
-
-
-def projected_extent(
-    extent: QgsRectangle,
-    crs_from: QgsCoordinateReferenceSystem,
-    crs_to: QgsCoordinateReferenceSystem = QgsProject.instance().crs(),
-):
-    return QgsCoordinateTransform(crs_from, crs_to, QgsProject.instance()).transformBoundingBox(extent)
-
-
-def resolution_filter(extent: QgsRectangle, resolution=(1920, 1080), pixel_size=100):
-    """Returns a resolution that is at most the input resolution, else returns a smaller one."""
-    extent_with, extent_height = get_extent_size(extent)
-    extent_xpx = int(extent_with / pixel_size)
-    extent_ypx = int(extent_height / pixel_size)
-    resx = resolution[0] if extent_xpx > resolution[0] else extent_xpx
-    resy = resolution[1] if extent_ypx > resolution[1] else extent_ypx
-    qprint(f"resolution_filter {resx=}, {resy=}")
-    return resx, resy
-
-
-def current_displayed_pixels(iface):
-    extent = iface.mapCanvas().extent()
-    layer = iface.activeLayer()
-    px_size_x = layer.rasterUnitsPerPixelX()
-    px_size_y = layer.rasterUnitsPerPixelY()
-    xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x)
-    ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y)
-    return xsize, ysize
-
-
-# basic callback function
-# def progress_callback(pct, message, data, layer_name=""):
-#     # format pct as percetage
-#     qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
-#     return 1  # Return 1 to continue processing, or 0 to cancel
-
-# callback that prints only when the percentage changes
-# class ProgressCallback:
-#     def __init__(self, delta_pct=0.1):
-#         self.delta_pct = delta_pct
-#         self.last = 0
-#
-#     def __call__(self, pct, message, data, layer_name=""):
-#         if pct - self.last > self.delta_pct:
-#             qprint(f"reading/resampling layer:{layer_name} {pct:.2%}")
-#             self.last = pct
-#         return 1
-
-
-# callback that prints only when time between calls is greater than wait[seconds]
-class ProgressCallback:
-    def __init__(self, wait=1):
-        self.wait = wait
-        self.last = 0
-
-    def __call__(self, pct, message, data, *args, **kwargs):
-        now = time()
-        if now - self.last > self.wait:
-            qprint(f"  progress on {data} layer: {pct:.2%}")
-            self.last = now
-        return 1
+        if result:
+            print("===OK was pressed===")
+            QgsMessageLog.logMessage("OK was pressed", tag="Marraqueta", level=Qgis.Info)
+            self.dlg.model.print_current_params()
+
+        else:
+            print("===else than OK===")
+            self.dlg.model.print_all_params()

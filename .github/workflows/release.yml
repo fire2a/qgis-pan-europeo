@@ -16,45 +16,60 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@master
+      uses: actions/checkout@v2
+
+    - name: Set Release Tag
+      id: set_tag
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "RELEASE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          echo "TAG_DESCRIPTION=${{ github.sha }}" >> $GITHUB_ENV
+        else
+          echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          TAG_NAME=$(git describe --tags)
+          echo "TAG_DESCRIPTION=$(git tag -n99 $TAG_NAME | sed -n '2p')" >> $GITHUB_ENV
+        fi
 
     - name: Version bump
       run: |
-         VERSION=${GITHUB_REF_NAME#v}
+         VERSION=${{ env.RELEASE_TAG }}
          echo "version is ${VERSION}"
          sed -i -e "s/version=0.0.1/version=${VERSION}/" pan_batido/metadata.txt
          git add pan_batido/metadata.txt
 
     - name: Checkout fire2a-lib
-      uses: actions/checkout@master
+      uses: actions/checkout@v2
       with:
         repository: "fire2a/fire2a-lib" 
         path: "fire2a"
         sparse-checkout: |
-          src/fire2a/raster.py
+          src/fire2a/raster/*
           src/fire2a/utils.py
         sparse-checkout-cone-mode: false
 
     - name: git archive
       run: |
          echo "Changing fire2a from installed to relative import"
-         mkdir -p pan_batido/fire2a
-         mv fire2a/src/fire2a/raster.py pan_batido/fire2a
-         mv fire2a/src/fire2a/utils.py pan_batido/fire2a
-         # rm -rf fire2a
+         mkdir pan_batido/fire2a
+         mv fire2a/src/fire2a/raster pan_batido/fire2a/.
+         cp fire2a/src/fire2a/utils.py pan_batido/fire2a/.
+         rm -rf fire2a
          grep -Rl --include=*py "from fire2a" | tee will.change | xargs -I {} sed -i "s/^from fire2a/from .fire2a/" {}
          echo "Changed files"
          cat will.change 
-         # rm will.change
+         rm will.change
 
          git add pan_batido/fire2a
          lestash=`git stash create`
 
-         git archive --output "pan_batido_${{ github.ref_name }}.zip" $lestash pan_batido
+         git archive --output "pan_batido_${{ env.RELEASE_TAG }}.zip" $lestash pan_batido
 
     - name: Create Release
       uses: ncipollo/release-action@v1.12.0
       with:
-        artifacts: "pan_batido_${{ github.ref_name }}.zip"
+        artifacts: "pan_batido_${{ env.RELEASE_TAG }}.zip"
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: true
+        tag: ${{ env.RELEASE_TAG }}
+        name: ${{ env.RELEASE_TAG }}
+        body: ${{ env.TAG_DESCRIPTION }}

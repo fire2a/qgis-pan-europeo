@@ -26,6 +26,17 @@ GRIORAS = {
     "None": None,
 }
 
+UTILITY_FUNCTIONS = [
+    {"name": "minmax", "description": "min-max", "numvars": 0},
+    {"name": "maxmin", "description": "max-min", "numvars": 0},
+    {"name": "bipiecewiselinear", "description": "bi-piecewise-linear values", "numvars": 2},
+    {"name": "bipiecewiselinear_percent", "description": "bi-piecewise-linear percentages", "numvars": 2},
+    {"name": "stepup", "description": "step up value", "numvars": 1},
+    {"name": "stepup_percent", "description": "step up percentage", "numvars": 1},
+    {"name": "stepdown", "description": "step down value", "numvars": 1},
+    {"name": "stepdown_percent", "description": "step down percentage", "numvars": 1},
+]  # no cambiar orden!
+
 
 def qprint(*args, tag="Marraqueta", level=Qgis.Info, sep=" ", end="", **kwargs):
     QgsMessageLog.logMessage(sep.join(map(str, args)) + end, tag, level, **kwargs)
