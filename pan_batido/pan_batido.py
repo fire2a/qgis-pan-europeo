@@ -27,8 +27,15 @@
 # InteractiveShellEmbed()()
 # fmt: on
 """
+import importlib
+import multiprocessing
 import os.path
+import sys
+from functools import partial
+from time import sleep
 
+from qgis.core import (Qgis, QgsApplication, QgsMessageLog, QgsProcessingAlgRunnerTask, QgsProcessingContext,
+                       QgsProcessingFeedback, QgsProject, QgsTask, QgsTaskManager)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
@@ -184,6 +191,7 @@ class Marraqueta:
         if self.first_start == True:
             self.first_start = False
             self.dlg = MarraquetaDialog()
+            print("===Dialog created===")
         else:
             self.dlg.populate_rasters()
 
@@ -193,10 +201,10 @@ class Marraqueta:
         result = self.dlg.exec_()
         # See if OK was pressed
         if result:
-            print("OK was pressed")
+            print("===OK was pressed===")
+            QgsMessageLog.logMessage("OK was pressed", tag="Marraqueta", level=Qgis.Info)
             self.dlg.model.print_current_params()
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
+
         else:
-            print("else was pressed")
+            print("===else than OK===")
             self.dlg.model.print_all_params()

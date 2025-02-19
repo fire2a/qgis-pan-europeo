@@ -385,3 +385,14 @@ def current_displayed_pixels(iface):
     xsize = int((extent.xMaximum() - extent.xMinimum()) / px_size_x)
     ysize = int((extent.yMinimum() - extent.yMaximum()) / px_size_y)
     return xsize, ysize
+
+
+def get_raster_info(layer):
+    if layer.isValid():
+        prov = layer.dataProvider()
+        if self.min_val is None or self.max_val is None:
+            stats = prov.bandStatistics(1, QgsRasterBandStats.All, layer.extent(), 0)
+            self.min_val = stats.minimumValue if self.min_val is None else self.min_val
+            self.max_val = stats.maximumValue if self.max_val is None else self.max_val
+        if self.bands is None:
+            self.bands = layer.bandCount()
