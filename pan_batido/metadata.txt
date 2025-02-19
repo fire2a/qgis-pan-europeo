@@ -15,7 +15,6 @@ hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 
 changelog=
-        0.0.10 backend to gdal_calc
         0.0.9 Better logging: summarizes the input instance and gdal callback every 0.5 seconds
         0.0.8 Skip non-rasters or non-local rasters on dialog creation, common transform of extents before intersection
         0.0.7 Invisible rasters load
