@@ -53,7 +53,7 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
         # Set up columns for treeWidget
         self.treeWidget.setColumnCount(4)
-        self.treeWidget.setHeaderLabels(["Raster Name", "Weight", "Utility Function", "Parameters"])
+        self.treeWidget.setHeaderLabels(["Raster Name", "Weight %", "Utility Function", "Parameters"])
 
         # Connect the buttonBox
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.accept)
