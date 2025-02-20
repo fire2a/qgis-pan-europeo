@@ -18,6 +18,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
+    - name: Resolve symbolic links
+      run: |
+        chmod +x resolve_symlinks.sh
+        ./resolve_symlinks.sh
+
     - name: Set Release Tag
       id: set_tag
       run: |
