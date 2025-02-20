@@ -65,15 +65,19 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
         # Initialize the model
         self.model = PanRasters()
+        
+        # Connect the itemChanged signal to a custom slot
+        self.treeWidget.itemChanged.connect(self.on_item_changed)
 
         # Populate the UI with rasters and utility functions
         self.populate_rasters()
 
-        # Connect the itemChanged signal to a custom slot
-        self.treeWidget.itemChanged.connect(self.on_item_changed)
+
 
     def populate_rasters(self):
         """Populate the UI with the list of rasters and utility functions."""
+        self.treeWidget.itemChanged.disconnect(self.on_item_changed)
+        
         # Clear existing items in the treeWidget
         self.treeWidget.clear()
 
@@ -115,6 +119,8 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
             # Trigger the utility function change to add the correct number of ParamWidgets
             self.on_utility_function_changed(utility_combo.currentIndex(), utility_combo, tree_item)
+        
+        self.treeWidget.itemChanged.connect(self.on_item_changed)
 
     def on_utility_function_changed(self, index, combo, tree_item):
         """Handle utility function selection change."""
@@ -157,7 +163,7 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def update_param_value(self, value, raster_name, func, param_name):
         """Update a parameter of a raster and utility function in the model."""
-        print(f"update_param_value: {param_name=} {value=} {func=} {raster_name=}")
+        # print(f"update_param_value: {param_name=} {value=} {func=} {raster_name=}")
         params = self.model.get_raster_params(raster_name, func)
         params[param_name]["value"] = value
         self.model.set_raster_params(raster_name, func, params)
