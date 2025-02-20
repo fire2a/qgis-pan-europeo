@@ -43,6 +43,8 @@ from ..views.param_widget_list import ParamWidgetList
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "pan_batido_dialog_base.ui"))
 
+from ..constants import UTILITY_FUNCTIONS
+
 
 class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
     def __init__(self, parent=None):
@@ -65,23 +67,22 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
         # Initialize the model
         self.model = PanRasters()
-        
+
+        # Connect the visibilityChanged signal to the handler method
+        self.model.visibilityChanged.connect(self.on_visibility_changed)
+
         # Connect the itemChanged signal to a custom slot
         self.treeWidget.itemChanged.connect(self.on_item_changed)
 
         # Populate the UI with rasters and utility functions
         self.populate_rasters()
 
-
-
     def populate_rasters(self):
         """Populate the UI with the list of rasters and utility functions."""
         self.treeWidget.itemChanged.disconnect(self.on_item_changed)
-        
+
         # Clear existing items in the treeWidget
         self.treeWidget.clear()
-
-        utility_functions = self.model.get_utility_functions()
 
         # Populate treeWidget
         for raster_name, raster in self.model.get_rasters().items():
@@ -89,11 +90,10 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
             tree_item = QtWidgets.QTreeWidgetItem(self.treeWidget)
             tree_item.setText(0, raster_name)
             tree_item.setCheckState(0, Qt.Checked if self.model.get_visibility(raster_name) else Qt.Unchecked)
-            # tree_item.setData(0, Qt.UserRole, raster_name)  # Store the raster name in the item
 
             # Create a combo box for utility functions
             utility_combo = QtWidgets.QComboBox()
-            for func in utility_functions:
+            for func in UTILITY_FUNCTIONS:
                 utility_combo.addItem(func["description"], func["name"])
 
             # Check if it has a utility function selected and update the combo box
@@ -119,8 +119,18 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
             # Trigger the utility function change to add the correct number of ParamWidgets
             self.on_utility_function_changed(utility_combo.currentIndex(), utility_combo, tree_item)
-        
+
         self.treeWidget.itemChanged.connect(self.on_item_changed)
+
+    def on_visibility_changed(self, raster_name, visible):
+        """Handle the visibilityChanged signal from the model."""
+        root = self.treeWidget.invisibleRootItem()
+        child_count = root.childCount()
+        for i in range(child_count):
+            top_level_item = root.child(i)
+            if top_level_item.text(0) == raster_name:
+                top_level_item.setCheckState(0, Qt.Checked if visible else Qt.Unchecked)
+                break
 
     def on_utility_function_changed(self, index, combo, tree_item):
         """Handle utility function selection change."""
@@ -133,7 +143,6 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
             self.treeWidget.removeItemWidget(tree_item, 3)
 
         # Retrieve the raster name from the tree_text
-        # raster_name = tree_item.data(0, Qt.UserRole)
         raster_name = tree_item.text(0)
 
         # Restore previous values from the model
@@ -163,7 +172,6 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def update_param_value(self, value, raster_name, func, param_name):
         """Update a parameter of a raster and utility function in the model."""
-        # print(f"update_param_value: {param_name=} {value=} {func=} {raster_name=}")
         params = self.model.get_raster_params(raster_name, func)
         params[param_name]["value"] = value
         self.model.set_raster_params(raster_name, func, params)
@@ -186,7 +194,7 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def reset(self):
         """Reset the model to its initial state."""
-        self.model.clear_rasters()
+        self.model.reset()
         self.populate_rasters()
 
     def apply(self):

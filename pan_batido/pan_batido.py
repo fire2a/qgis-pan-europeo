@@ -224,6 +224,7 @@ def doit(self, iface, model, view):
     - use the processing algorithm "paneuropeo:sumator" to sum all the normalized rasters with their weights
     - chain the sumator to run after all the normalizators
     """
+
     norm_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator")
     sum_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator")
 
@@ -246,9 +247,17 @@ def doit(self, iface, model, view):
                 QgsProject.instance().addMapLayer(layer)
                 print("from file")
 
-    for raster_name, raster in model.get_rasters().items():
+    rasters = model.get_rasters()
+    model.balance_weights()
+    for raster_name, raster in rasters.items():
+        # fmt: off
+        # from qgis.PyQt.QtCore import pyqtRemoveInputHook
+        # pyqtRemoveInputHook()
+        # from IPython.terminal.embed import InteractiveShellEmbed
+        # InteractiveShellEmbed()()
+        # fmt: on
         if model.get_visibility(raster_name):
-            weights += [model.get_weight(raster_name)]
+            weights += [model.get_weight(raster_name) / 100]
 
             method = model.get_current_utility_function_name(raster_name)
             if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
