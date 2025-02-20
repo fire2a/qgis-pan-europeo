@@ -32,11 +32,12 @@ import multiprocessing
 import os.path
 import sys
 from functools import partial
+from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from time import sleep
 
 from qgis.core import (Qgis, QgsApplication, QgsMessageLog, QgsProcessingAlgRunnerTask, QgsProcessingContext,
-                       QgsProcessingFeedback, QgsProject, QgsTask, QgsTaskManager)
+                       QgsProcessingFeedback, QgsProject, QgsRasterLayer, QgsTask, QgsTaskManager)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
@@ -80,6 +81,10 @@ class Marraqueta:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        self.tasks = []
+        self.final_task = None
+        self.context = QgsProcessingContext()
+        self.feedback = QgsProcessingFeedback()
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -197,7 +202,7 @@ class Marraqueta:
             print("===Dialog created===")
         else:
             self.dlg.populate_rasters()
-            doit(self.iface, self.dlg.model)
+        self.context.setProject(QgsProject.instance())
 
         # show the dialog
         self.dlg.show()
@@ -208,14 +213,14 @@ class Marraqueta:
             print("===OK was pressed===")
             QgsMessageLog.logMessage("OK was pressed", tag="Marraqueta", level=Qgis.Info)
             self.dlg.model.print_current_params()
-            doit(self.iface, self.dlg.model, self.dlg)
+            doit(self, self.iface, self.dlg.model, self.dlg)
 
         else:
             print("===else than OK===")
             self.dlg.model.print_all_params()
 
 
-def doit(iface, model, view):
+def doit(self, iface, model, view):
     """
     Run the calculations
     - get a temporary folder
@@ -224,86 +229,79 @@ def doit(iface, model, view):
     - use the processing algorithm "paneuropeo:sumator" to sum all the normalized rasters with their weights
     - chain the sumator to run after all the normalizators
     """
-    from qgis.core import QgsMessageLog
-
     norm_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator")
-    # sum_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator")
-    context = QgsProcessingContext()
-    feedback = QgsProcessingFeedback()
+    sum_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator")
 
-    tasks = []
     weights = []
     outfiles = []
 
-    def task_finished(context, successful, results, outfiles):
-        print(f"{results=}")
+    def task_finished(context, successful, results):
+        # fmt: off
+        # from qgis.PyQt.QtCore import pyqtRemoveInputHook
+        # pyqtRemoveInputHook()
+        # from IPython.terminal.embed import InteractiveShellEmbed
+        # InteractiveShellEmbed()()
+        # fmt: on
         if not successful:
-            QgsMessageLog.logMessage("Task finished unsuccessfully", MESSAGE_CATEGORY, Qgis.Warning)
+            QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", MESSAGE_CATEGORY, Qgis.Warning)
         else:
-            QgsMessageLog.logMessage("Task finished successfully", MESSAGE_CATEGORY, Qgis.Info)
+            QgsMessageLog.logMessage(f"Task finished successfully {results}", MESSAGE_CATEGORY, Qgis.Info)
             output_layer = context.getMapLayer(results["OUTPUT"])
             if output_layer and output_layer.isValid():
                 QgsProject.instance().addMapLayer(context.takeResultLayer(output_layer.id()))
-            outfiles.append(results["OUTPUT"])
+                print("from context")
+            elif Path(results["OUTPUT"]).is_file():
+                layer = QgsRasterLayer(results["OUTPUT"], "Normalized")
+                QgsProject.instance().addMapLayer(layer)
+                print("from file")
 
     for raster_name, raster in model.get_rasters().items():
         if model.get_visibility(raster_name):
-            weights.append(model.get_weight(raster_name))
+            weights += [model.get_weight(raster_name)]
             method = model.get_current_utility_function_name(raster_name)
             func_params = model.get_raster_params(raster_name, method)
 
+            outfile = NamedTemporaryFile(suffix=".tif", delete=False)
+
             algo_param = {
                 "EXTENT_OPT": 0,
-                "INPUT_A": raster.publicSource(),
+                "INPUT_A": raster,  # .publicSource(),
                 "MAX": None,
                 "METHOD": 0,
                 "MIN": 1,
                 "NO_DATA": None,
-                "OUTPUT": "TEMPORARY_OUTPUT",
+                "OUTPUT": outfile.name,
                 "PARAMS": func_params,
                 "PROJWIN": None,
                 "RTYPE": 7,
             }
-            task = QgsProcessingAlgRunnerTask(norm_alg, algo_param, context, feedback)
-            task.executed.connect(partial(task_finished, context, outfiles=outfiles))
-            tasks.append(task)
-            QgsApplication.taskManager().addTask(task)
-            print(f"{raster_name=} task added")
+
+            task = QgsProcessingAlgRunnerTask(norm_alg, algo_param, self.context, self.feedback)
+            task.setDescription(f"Normalizing {raster_name}")
+            task.executed.connect(partial(task_finished, self.context))
+            self.tasks += [task]
+            outfiles += [outfile.name]
 
     # sum task
-    # def final_task_finished(context, successful, results):
-    #     print("results = ", results)
-    #     if not successful:
-    #         QgsMessageLog.logMessage("Final task finished unsuccessfully", MESSAGE_CATEGORY, Qgis.Warning)
-    #     else:
-    #         QgsMessageLog.logMessage("Final task finished successfully", MESSAGE_CATEGORY, Qgis.Info)
-    #         output_layer = context.getMapLayer(results["OUTPUT"])
-    #         if output_layer and output_layer.isValid():
-    #             QgsProject.instance().addMapLayer(context.takeResultLayer(output_layer.id()))
+    self.final_task = QgsProcessingAlgRunnerTask(
+        sum_alg,
+        {
+            "EXTENT_OPT": 0,
+            "INPUT": outfiles,
+            "NO_DATA": None,
+            "OUTPUT": "TEMPORARY_OUTPUT",
+            "PROJWIN": None,
+            "RTYPE": 7,
+            "WEIGHTS": " ".join(map(str, weights)),
+        },
+        self.context,
+        self.feedback,
+    )
+    self.final_task.executed.connect(partial(task_finished, self.context))
 
-    # final_task = QgsProcessingAlgRunnerTask(
-    #     sum_alg,
-    #     {
-    #         "EXTENT_OPT": 0,
-    #         "INPUT": outfiles,
-    #         "NO_DATA": None,
-    #         "OUTPUT": "TEMPORARY_OUTPUT",
-    #         "PROJWIN": None,
-    #         "RTYPE": 7,
-    #         "WEIGHTS": " ".join(map(str, weights)),
-    #     },
-    #     context,
-    #     feedback,
-    # )
-    # final_task.executed.connect(partial(final_task_finished, context))
+    # Add the final sum task as a subtask with dependencies on all normalization tasks
+    for task in self.tasks:
+        self.final_task.addSubTask(task, [], QgsTask.SubTaskDependency.ParentDependsOnSubTask)
 
-    # # Add the final sum task as a subtask with dependencies on all normalization tasks
-    # for task in tasks:
-    #     # final_task.addSubTask(task, [], QgsTask.ParentDependsOnSubTask)
-    #     task.addSubTask(final_task, [], QgsTask.ParentDependsOnSubTask)
-    #     # task.addSubTask(final_task, dependencies=tasks)
-
-    # final_task.addSubTask(task, [], QgsTask.ParentDependsOnSubTask)
-
-    # print("so far so good")
-    # QgsApplication.taskManager().addTask(final_task)
+    print("so far so good")
+    QgsApplication.taskManager().addTask(self.final_task)
