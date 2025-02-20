@@ -11,7 +11,14 @@ from ..constants import UTILITY_FUNCTIONS
 
 
 def get_file_minmax(filename, force=True):
+    # try:
     dataset = Open(filename, GA_ReadOnly)
+    # except Exception as e:
+    #     if "not recognized as a supported file format" in str(e):
+    #         raise FileExistsError(
+    #             f"{filename} is not a GDAL supported file format, remove the raster layer, and try again."
+    #         )
+    # FIXME iface.messageBar().pushMessage("Error", "I'm sorry Dave, I'm afraid I can't do that", level=Qgis.Critical)
     if dataset is None:
         raise FileNotFoundError(filename)
     raster_band = dataset.GetRasterBand(1)
