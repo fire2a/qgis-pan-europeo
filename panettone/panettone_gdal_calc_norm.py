@@ -40,6 +40,8 @@ from qgis.core import (QgsProcessingException, QgsProcessingParameterDefinition,
                        QgsProcessingParameterString)
 from qgis.PyQt.QtCore import QCoreApplication
 
+from .constants import METHODS
+
 
 class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
     INPUT_A = "INPUT_A"
@@ -59,17 +61,6 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
 
     TYPE = GDALDataTypeNames
 
-    METHODS = [
-        "minmax",
-        "maxmin",
-        "stepup",
-        "stepdown",
-        "bipiecewiselinear",
-        "bipiecewiselinear_percent",
-        "stepdown_percent",
-        "stepup_percent",
-    ]
-
     def __init__(self):
         super().__init__()
 
@@ -86,7 +77,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
             QgsProcessingParameterEnum(
                 self.METHOD,
                 self.tr("Normalization <b>method</b>"),
-                options=self.METHODS,
+                options=METHODS,
                 defaultValue=0,
             )
         )
@@ -218,7 +209,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
             noData = None
 
         arguments = [
-            f"--method {self.METHODS[method]}",
+            f"--method {METHODS[method]}",
             "--format",
             GdalUtils.getFormatShortNameFromFilename(out),
         ]

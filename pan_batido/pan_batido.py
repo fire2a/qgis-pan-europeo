@@ -42,12 +42,11 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
+from .constants import METHODS, TAG
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
 # Import the code for the dialog
 from .views.pan_batido_dialog import MarraquetaDialog
-
-TAG = "PanEuropeo"
 
 
 class Marraqueta:
