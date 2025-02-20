@@ -47,7 +47,7 @@ from .resources.resources import *
 # Import the code for the dialog
 from .views.pan_batido_dialog import MarraquetaDialog
 
-MESSAGE_CATEGORY = "AlgRunnerTask"
+TAG = "PanEuropeo"
 
 
 class Marraqueta:
@@ -211,7 +211,7 @@ class Marraqueta:
         # See if OK was pressed
         if result:
             print("===OK was pressed===")
-            QgsMessageLog.logMessage("OK was pressed", tag="Marraqueta", level=Qgis.Info)
+            QgsMessageLog.logMessage("OK was pressed", tag=TAG, level=Qgis.Info)
             self.dlg.model.print_current_params()
             doit(self, self.iface, self.dlg.model, self.dlg)
 
@@ -234,8 +234,10 @@ def doit(self, iface, model, view):
 
     weights = []
     outfiles = []
+    self.tasks = []
+    self.final_task = None
 
-    def task_finished(context, successful, results):
+    def task_finished(context, successful, results, force_name="Result"):
         # fmt: off
         # from qgis.PyQt.QtCore import pyqtRemoveInputHook
         # pyqtRemoveInputHook()
@@ -243,15 +245,15 @@ def doit(self, iface, model, view):
         # InteractiveShellEmbed()()
         # fmt: on
         if not successful:
-            QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", MESSAGE_CATEGORY, Qgis.Warning)
+            QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", tag=TAG, level=Qgis.Warning)
         else:
-            QgsMessageLog.logMessage(f"Task finished successfully {results}", MESSAGE_CATEGORY, Qgis.Info)
+            QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)
             output_layer = context.getMapLayer(results["OUTPUT"])
             if output_layer and output_layer.isValid():
                 QgsProject.instance().addMapLayer(context.takeResultLayer(output_layer.id()))
                 print("from context")
             elif Path(results["OUTPUT"]).is_file():
-                layer = QgsRasterLayer(results["OUTPUT"], "Normalized")
+                layer = QgsRasterLayer(results["OUTPUT"], force_name)
                 QgsProject.instance().addMapLayer(layer)
                 print("from file")
 
@@ -278,7 +280,7 @@ def doit(self, iface, model, view):
 
             task = QgsProcessingAlgRunnerTask(norm_alg, algo_param, self.context, self.feedback)
             task.setDescription(f"Normalizing {raster_name}")
-            task.executed.connect(partial(task_finished, self.context))
+            task.executed.connect(partial(task_finished, self.context, force_name="norm_" + raster_name))
             self.tasks += [task]
             outfiles += [outfile.name]
 
@@ -297,7 +299,7 @@ def doit(self, iface, model, view):
         self.context,
         self.feedback,
     )
-    self.final_task.executed.connect(partial(task_finished, self.context))
+    self.final_task.executed.connect(partial(task_finished, self.context, force_name="Result"))
 
     # Add the final sum task as a subtask with dependencies on all normalization tasks
     for task in self.tasks:
