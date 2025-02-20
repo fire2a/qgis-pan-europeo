@@ -1,11 +1,30 @@
 from copy import deepcopy
-from math import ceil, floor
 from pathlib import Path
 
-from fire2a.raster import read_raster
+from osgeo.gdal import GA_ReadOnly, Open
 from qgis.core import QgsProject, QgsRasterLayer
 
 from ..constants import UTILITY_FUNCTIONS
+
+# from qgis.core import Qgis, QgsMessageLog, QgsProject, QgsRasterLayer
+
+
+def get_file_minmax(filename, force=True):
+    dataset = Open(filename, GA_ReadOnly)
+    if dataset is None:
+        raise FileNotFoundError(filename)
+    raster_band = dataset.GetRasterBand(1)
+    rmin = raster_band.GetMinimum()
+    rmax = raster_band.GetMaximum()
+    if not rmin or not rmax or force:
+        # start = time()
+        (rmin, rmax) = raster_band.ComputeRasterMinMax(True)
+        # QgsMessageLog.logMessage(
+        #     f"ComputeRasterMinMax took {time()-start} seconds {rmin=}, {rmax=}, {filename=}",
+        #     tag=TAG,
+        #     level=Qgis.Info,
+        # )
+    return rmin, rmax
 
 
 class PanRasters:
@@ -17,7 +36,8 @@ class PanRasters:
         self.weights = {}
         self.visibility = {}
         self.deleted = {}
-        self.info = {}
+        self.min = {}
+        self.max = {}
 
     def clear_rasters(self):
         """Clear the model."""
@@ -27,7 +47,8 @@ class PanRasters:
         self.weights = {}
         self.visibility = {}
         self.deleted = {}
-        self.info = {}
+        self.min = {}
+        self.max = {}
 
     def load_rasters(self):
         """Update the list of rasters from the current QGIS project."""
@@ -42,9 +63,7 @@ class PanRasters:
             }
             self.current_utility_function[raster_name] = None
             self.weights[raster_name] = 1
-            self.info[raster_name] = read_raster(raster.publicSource(), data=False, info=True)[1]
-            self.info[raster_name]["path"] = raster.publicSource()
-            self.update_params_range(raster_name, self.info[raster_name]["Minimum"], self.info[raster_name]["Maximum"])
+            self.set_minmax(raster_name, *get_file_minmax(raster.publicSource()))
             self.visibility[raster_name] = QgsProject.instance().layerTreeRoot().findLayer(raster.id()).isVisible()
 
     def update_rasters(self):
@@ -66,9 +85,7 @@ class PanRasters:
             }
             self.current_utility_function[raster_name] = None
             self.weights[raster_name] = 1
-            self.info[raster_name] = read_raster(raster.publicSource(), data=False, info=True)[1]
-            self.info[raster_name]["path"] = raster.publicSource()
-            self.update_params_range(raster_name, self.info[raster_name]["Minimum"], self.info[raster_name]["Maximum"])
+            self.set_minmax(raster_name, *get_file_minmax(raster.publicSource()))
 
         for raster_name in self.rasters:
             if raster_name in [r.name() for r in map_layers.values()]:
@@ -86,8 +103,8 @@ class PanRasters:
                 continue
             if params := self.get_raster_params(raster_name, func["name"]):
                 for param in params.values():
-                    param["min"] = floor(min_value)
-                    param["max"] = ceil(max_value)
+                    param["min"] = min_value
+                    param["max"] = max_value
                     param["value"] = max(min(param["value"], param["max"]), param["min"])
                 self.set_raster_params(raster_name, func["name"], params)
 
@@ -203,3 +220,11 @@ class PanRasters:
             visibility = self.visibility[raster_name]
             deleted = self.is_raster_deleted(raster_name)
             print(f"{raster_name[:7]=},\t{weight=},\t{current_func[:7]=},\t{params=},\t{visibility=},\t{deleted=}")
+
+    def get_minmax(self, raster_name):
+        return self.min.get(raster_name, None), self.max.get(raster_name, None)
+
+    def set_minmax(self, raster_name, min_value, max_value):
+        self.min[raster_name] = min_value
+        self.max[raster_name] = max_value
+        self.update_params_range(raster_name, min_value, max_value)

@@ -4,6 +4,8 @@ thanks to bfris
 https://stackoverflow.com/users/9705687/bfris
 https://stackoverflow.com/a/50300848
 """
+from math import ceil, floor
+
 from qgis.PyQt import QtCore, QtWidgets
 
 
@@ -26,10 +28,10 @@ class DoubleSlider(QtWidgets.QSlider):
         return float(super().value()) / self._multi
 
     def setMinimum(self, value):
-        return super().setMinimum(value * self._multi)
+        return super().setMinimum(ceil(value * self._multi))
 
     def setMaximum(self, value):
-        return super().setMaximum(value * self._multi)
+        return super().setMaximum(floor(value * self._multi))
 
     def setSingleStep(self, value):
         return super().setSingleStep(value * self._multi)
