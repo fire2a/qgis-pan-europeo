@@ -78,8 +78,8 @@ class Marraqueta:
         self.first_start = None
         self.tasks = []
         self.final_task = None
-        self.context = QgsProcessingContext()
-        self.feedback = QgsProcessingFeedback()
+        self.context = None
+        self.feedback = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -197,7 +197,6 @@ class Marraqueta:
             print("===Dialog created===")
         else:
             self.dlg.populate_rasters()
-        self.context.setProject(QgsProject.instance())
 
         # show the dialog
         self.dlg.show()
@@ -206,109 +205,130 @@ class Marraqueta:
         # See if OK was pressed
         if result:
             print("===OK was pressed===")
+            self.context = QgsProcessingContext()
+            self.context.setProject(QgsProject.instance())
+            self.feedback = QgsProcessingFeedback()
             QgsMessageLog.logMessage("OK was pressed", tag=TAG, level=Qgis.Info)
             self.dlg.model.print_current_params()
-            doit(self, self.iface, self.dlg.model, self.dlg)
+            self.doit(self.dlg.model, self.dlg)
 
         else:
             print("===else than OK===")
             self.dlg.model.print_all_params()
 
+    def doit(self, model, view):
+        """
+        Run the calculations
+        - get a temporary folder
+        - get n+1 temporary files in that folder
+        - use the processing algorithm "paneuropeo:normalizator" to normalize each raster
+        - use the processing algorithm "paneuropeo:sumator" to sum all the normalized rasters with their weights
+        - chain the sumator to run after all the normalizators
+        """
+        QgsMessageLog.logMessage(" ", tag=TAG, level=Qgis.Success)
+        QgsMessageLog.logMessage("Starting calculations", tag=TAG, level=Qgis.Info)
 
-def doit(self, iface, model, view):
-    """
-    Run the calculations
-    - get a temporary folder
-    - get n+1 temporary files in that folder
-    - use the processing algorithm "paneuropeo:normalizator" to normalize each raster
-    - use the processing algorithm "paneuropeo:sumator" to sum all the normalized rasters with their weights
-    - chain the sumator to run after all the normalizators
-    """
+        weights = []
+        outfiles = []
+        self.tasks = []
+        self.final_task = None
 
-    norm_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator")
-    sum_alg = QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator")
+        add2map = view.checkBox_load_normalized.isChecked()
 
-    weights = []
-    outfiles = []
-    self.tasks = []
-    self.final_task = None
-
-    def task_finished(context, successful, results, force_name="Result"):
-        if not successful:
-            QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", tag=TAG, level=Qgis.Warning)
-        else:
-            QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)
-            output_layer = context.getMapLayer(results["OUTPUT"])
-            if output_layer and output_layer.isValid():
-                QgsProject.instance().addMapLayer(context.takeResultLayer(output_layer.id()))
-                print("from context")
-            elif Path(results["OUTPUT"]).is_file():
-                layer = QgsRasterLayer(results["OUTPUT"], force_name)
-                QgsProject.instance().addMapLayer(layer)
-                print("from file")
-
-    rasters = model.get_rasters()
-    model.balance_weights()
-    for raster_name, raster in rasters.items():
-        # fmt: off
-        # from qgis.PyQt.QtCore import pyqtRemoveInputHook
-        # pyqtRemoveInputHook()
-        # from IPython.terminal.embed import InteractiveShellEmbed
-        # InteractiveShellEmbed()()
-        # fmt: on
-        if model.get_visibility(raster_name):
-            weights += [model.get_weight(raster_name) / 100]
-
-            method = model.get_current_utility_function_name(raster_name)
-            if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
-                minimum, maximum = model.get_minmax(raster_name)
+        def task_finished(context, successful, results, force_name="Result", add2map=True):
+            if not successful:
+                QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", tag=TAG, level=Qgis.Warning)
             else:
-                minimum, maximum = None, None
+                QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)
+                if add2map:
+                    output_layer = context.getMapLayer(results["OUTPUT"])
+                    if output_layer and output_layer.isValid():
+                        QgsProject.instance().addMapLayer(context.takeResultLayer(output_layer.id()))
+                        print("from context")
+                    elif Path(results["OUTPUT"]).is_file():
+                        layer = QgsRasterLayer(results["OUTPUT"], force_name)
+                        QgsProject.instance().addMapLayer(layer)
+                        print("from file")
 
-            func_params = model.get_raster_params(raster_name, method)
-            func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
+        rasters = model.get_rasters()
+        model.balance_weights()
+        for raster_name, raster in rasters.items():
+            # fmt: off
+            # from qgis.PyQt.QtCore import pyqtRemoveInputHook
+            # pyqtRemoveInputHook()
+            # from IPython.terminal.embed import InteractiveShellEmbed
+            # InteractiveShellEmbed()()
+            # fmt: on
+            if model.get_visibility(raster_name):
+                weight = model.get_weight(raster_name) / 100
+                weights += [weight]
 
-            outfile = NamedTemporaryFile(suffix=".tif", delete=False)
-            outfiles += [outfile.name]
+                method = model.get_current_utility_function_name(raster_name)
+                if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
+                    minimum, maximum = model.get_minmax(raster_name)
+                else:
+                    minimum, maximum = None, None
 
-            parameters = {
+                func_params = model.get_raster_params(raster_name, method)
+                func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
+
+                outfile = NamedTemporaryFile(suffix=".tif", delete=False).name
+                outfiles += [outfile]
+
+                task = QgsProcessingAlgRunnerTask(
+                    algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
+                    parameters={
+                        "EXTENT_OPT": 0,
+                        "INPUT_A": raster,  # .publicSource(),
+                        "MAX": maximum,
+                        "METHOD": method,
+                        "MIN": minimum,
+                        "NO_DATA": None,
+                        "OUTPUT": outfile,
+                        "PARAMS": func_values_str,
+                        "PROJWIN": None,
+                        "RTYPE": 7,
+                    },
+                    context=self.context,
+                    feedback=self.feedback,
+                )
+                task.setDescription(f"Normalizing {raster_name}")
+                task.executed.connect(
+                    partial(
+                        task_finished,
+                        self.context,
+                        force_name="norm_" + raster_name,
+                        add2map=add2map,
+                    )
+                )
+                self.tasks += [task]
+                # report
+                if func_values_str:
+                    func_values_str = " params: {func_values_str}"
+                QgsMessageLog.logMessage(
+                    f"{raster_name=} {weight=} {method=}" + func_values_str,
+                    tag=TAG,
+                    level=Qgis.Info,
+                )
+
+        self.final_task = QgsProcessingAlgRunnerTask(
+            algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator"),
+            parameters={
                 "EXTENT_OPT": 0,
-                "INPUT_A": raster,  # .publicSource(),
-                "MAX": maximum,
-                "METHOD": method,
-                "MIN": minimum,
+                "INPUT": outfiles,
                 "NO_DATA": None,
-                "OUTPUT": outfile.name,
-                "PARAMS": func_values_str,
+                "OUTPUT": "TEMPORARY_OUTPUT",
                 "PROJWIN": None,
                 "RTYPE": 7,
-            }
+                "WEIGHTS": " ".join(map(str, weights)),
+            },
+            context=self.context,
+            feedback=self.feedback,
+        )
+        self.final_task.executed.connect(partial(task_finished, self.context, force_name="Result", add2map=True))
 
-            task = QgsProcessingAlgRunnerTask(norm_alg, parameters, self.context, self.feedback)
-            task.setDescription(f"Normalizing {raster_name}")
-            task.executed.connect(partial(task_finished, self.context, force_name="norm_" + raster_name))
-            self.tasks += [task]
+        # Add the final sum task as a subtask with dependencies on all normalization tasks
+        for task in self.tasks:
+            self.final_task.addSubTask(task, [], QgsTask.SubTaskDependency.ParentDependsOnSubTask)
 
-    # sum task
-    self.final_task = QgsProcessingAlgRunnerTask(
-        sum_alg,
-        {
-            "EXTENT_OPT": 0,
-            "INPUT": outfiles,
-            "NO_DATA": None,
-            "OUTPUT": "TEMPORARY_OUTPUT",
-            "PROJWIN": None,
-            "RTYPE": 7,
-            "WEIGHTS": " ".join(map(str, weights)),
-        },
-        self.context,
-        self.feedback,
-    )
-    self.final_task.executed.connect(partial(task_finished, self.context, force_name="Result"))
-
-    # Add the final sum task as a subtask with dependencies on all normalization tasks
-    for task in self.tasks:
-        self.final_task.addSubTask(task, [], QgsTask.SubTaskDependency.ParentDependsOnSubTask)
-
-    print("so far so good")
-    QgsApplication.taskManager().addTask(self.final_task)
+        QgsApplication.taskManager().addTask(self.final_task)
