@@ -27,22 +27,18 @@
 # InteractiveShellEmbed()()
 # fmt: on
 """
-import importlib
-import multiprocessing
 import os.path
-import sys
 from functools import partial
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
-from time import sleep
+from tempfile import NamedTemporaryFile
 
 from qgis.core import (Qgis, QgsApplication, QgsMessageLog, QgsProcessingAlgRunnerTask, QgsProcessingContext,
-                       QgsProcessingFeedback, QgsProject, QgsRasterLayer, QgsTask, QgsTaskManager)
+                       QgsProcessingFeedback, QgsProject, QgsRasterLayer, QgsTask)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from .constants import METHODS, TAG
+from .constants import TAG
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
 # Import the code for the dialog
@@ -237,12 +233,6 @@ def doit(self, iface, model, view):
     self.final_task = None
 
     def task_finished(context, successful, results, force_name="Result"):
-        # fmt: off
-        # from qgis.PyQt.QtCore import pyqtRemoveInputHook
-        # pyqtRemoveInputHook()
-        # from IPython.terminal.embed import InteractiveShellEmbed
-        # InteractiveShellEmbed()()
-        # fmt: on
         if not successful:
             QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", tag=TAG, level=Qgis.Warning)
         else:
@@ -259,29 +249,36 @@ def doit(self, iface, model, view):
     for raster_name, raster in model.get_rasters().items():
         if model.get_visibility(raster_name):
             weights += [model.get_weight(raster_name)]
+
             method = model.get_current_utility_function_name(raster_name)
+            if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
+                minimum, maximum = model.get_minmax(raster_name)
+            else:
+                minimum, maximum = None, None
+
             func_params = model.get_raster_params(raster_name, method)
+            func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
 
             outfile = NamedTemporaryFile(suffix=".tif", delete=False)
+            outfiles += [outfile.name]
 
-            algo_param = {
+            parameters = {
                 "EXTENT_OPT": 0,
                 "INPUT_A": raster,  # .publicSource(),
-                "MAX": None,
-                "METHOD": 0,
-                "MIN": 1,
+                "MAX": maximum,
+                "METHOD": method,
+                "MIN": minimum,
                 "NO_DATA": None,
                 "OUTPUT": outfile.name,
-                "PARAMS": func_params,
+                "PARAMS": func_values_str,
                 "PROJWIN": None,
                 "RTYPE": 7,
             }
 
-            task = QgsProcessingAlgRunnerTask(norm_alg, algo_param, self.context, self.feedback)
+            task = QgsProcessingAlgRunnerTask(norm_alg, parameters, self.context, self.feedback)
             task.setDescription(f"Normalizing {raster_name}")
             task.executed.connect(partial(task_finished, self.context, force_name="norm_" + raster_name))
             self.tasks += [task]
-            outfiles += [outfile.name]
 
     # sum task
     self.final_task = QgsProcessingAlgRunnerTask(
