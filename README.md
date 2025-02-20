@@ -1,4 +1,5 @@
-Please mantra-request@osgeo.org, I'm requesting a OSGeo UserID, to this proof of concept plugin!
+- Dialog plugin : ![Pan Batido](https://plugins.qgis.org/plugins/pan_batido/)
+- GdalAlgorithmProcessing plugin : ![Panettone](panettone/README.md)
 
 # Pan European Raster Algorithms (PERA) project
 
