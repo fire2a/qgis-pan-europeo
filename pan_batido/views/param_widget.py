@@ -33,3 +33,7 @@ class ParamWidget(QtWidgets.QWidget):
 
     def setValue(self, value):
         self.spinbox.setValue(value)
+
+    def setRange(self, min, max):
+        self.spinbox.setRange(min, max)
+        self.slider.setRange(min, max)

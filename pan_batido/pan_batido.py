@@ -33,12 +33,13 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from qgis.core import (Qgis, QgsApplication, QgsMessageLog, QgsProcessingAlgRunnerTask, QgsProcessingContext,
-                       QgsProcessingFeedback, QgsProject, QgsRasterLayer, QgsTask)
+                       QgsProject, QgsRasterLayer, QgsTask)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
 from .constants import TAG
+from .models.pan_rasters import PanRasters
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
 # Import the code for the dialog
@@ -79,7 +80,8 @@ class Marraqueta:
         self.tasks = []
         self.final_task = None
         self.context = None
-        self.feedback = None
+        self.model = None
+        self.dlg = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -193,7 +195,10 @@ class Marraqueta:
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = MarraquetaDialog()
+            self.context = QgsProcessingContext()
+            self.context.setProject(QgsProject.instance())
+            self.model = PanRasters(self.iface, self.context)
+            self.dlg = MarraquetaDialog(self.iface, self.model)
             print("===Dialog created===")
         else:
             self.dlg.populate_rasters()
@@ -205,12 +210,9 @@ class Marraqueta:
         # See if OK was pressed
         if result:
             print("===OK was pressed===")
-            self.context = QgsProcessingContext()
-            self.context.setProject(QgsProject.instance())
-            self.feedback = QgsProcessingFeedback()
             QgsMessageLog.logMessage("OK was pressed", tag=TAG, level=Qgis.Info)
-            self.dlg.model.print_current_params()
-            self.doit(self.dlg.model, self.dlg)
+            self.model.print_current_params()
+            self.doit(self.model, self.dlg)
 
         else:
             print("===else than OK===")
@@ -253,12 +255,6 @@ class Marraqueta:
         rasters = model.get_rasters()
         model.balance_weights()
         for raster_name, raster in rasters.items():
-            # fmt: off
-            # from qgis.PyQt.QtCore import pyqtRemoveInputHook
-            # pyqtRemoveInputHook()
-            # from IPython.terminal.embed import InteractiveShellEmbed
-            # InteractiveShellEmbed()()
-            # fmt: on
             if model.get_visibility(raster_name):
                 weight = model.get_weight(raster_name) / 100
                 weights += [weight]
@@ -290,7 +286,6 @@ class Marraqueta:
                         "RTYPE": 7,
                     },
                     context=self.context,
-                    feedback=self.feedback,
                 )
                 task.setDescription(f"Normalizing {raster_name}")
                 task.executed.connect(
@@ -323,7 +318,6 @@ class Marraqueta:
                 "WEIGHTS": " ".join(map(str, weights)),
             },
             context=self.context,
-            feedback=self.feedback,
         )
         self.final_task.executed.connect(partial(task_finished, self.context, force_name="Result", add2map=True))
 

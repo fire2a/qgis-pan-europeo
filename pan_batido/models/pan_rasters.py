@@ -1,45 +1,25 @@
 from copy import deepcopy
+from functools import partial
+from math import isclose
 from pathlib import Path
 
 from osgeo.gdal import GA_ReadOnly, Open
-from qgis.core import QgsProject, QgsRasterLayer
+from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsMessageLog, QgsProcessingAlgRunnerTask,
+                       QgsProcessingFeatureSourceDefinition, QgsProject, QgsRasterLayer, QgsVectorLayer)
 from qgis.PyQt.QtCore import QObject, pyqtSignal
 
-from ..constants import UTILITY_FUNCTIONS
+from ..constants import TAG, UTILITY_FUNCTIONS
 
 # from qgis.core import Qgis, QgsMessageLog, QgsProject, QgsRasterLayer
-
-
-def get_file_minmax(filename, force=True):
-    # try:
-    dataset = Open(filename, GA_ReadOnly)
-    # except Exception as e:
-    #     if "not recognized as a supported file format" in str(e):
-    #         raise FileExistsError(
-    #             f"{filename} is not a GDAL supported file format, remove the raster layer, and try again."
-    #         )
-    # FIXME iface.messageBar().pushMessage("Error", "I'm sorry Dave, I'm afraid I can't do that", level=Qgis.Critical)
-    if dataset is None:
-        raise FileNotFoundError(filename)
-    raster_band = dataset.GetRasterBand(1)
-    rmin = raster_band.GetMinimum()
-    rmax = raster_band.GetMaximum()
-    if not rmin or not rmax or force:
-        # start = time()
-        (rmin, rmax) = raster_band.ComputeRasterMinMax(True)
-        # QgsMessageLog.logMessage(
-        #     f"ComputeRasterMinMax took {time()-start} seconds {rmin=}, {rmax=}, {filename=}",
-        #     tag=TAG,
-        #     level=Qgis.Info,
-        # )
-    return rmin, rmax
 
 
 class PanRasters(QObject):
     visibilityChanged = pyqtSignal(str, bool)
 
-    def __init__(self):
+    def __init__(self, iface, context):
         super().__init__()
+        self.context = context
+        self.iface = iface
         self.rasters = {}
         self.raster_params = {}
         self.current_utility_function = {}
@@ -100,7 +80,7 @@ class PanRasters(QObject):
                 self.raster_params[name] = {func["name"]: deepcopy(func["params"]) for func in UTILITY_FUNCTIONS}
                 self.current_utility_function[name] = None
                 self.weights[name] = 1
-                self.set_minmax(name, *get_file_minmax(raster.publicSource()))
+                self.set_minmax(name, *self.get_file_minmax(name, raster.publicSource()))
                 if layer := QgsProject.instance().layerTreeRoot().findLayer(raster.id()):
                     self.visibility[name] = layer.isVisible()
                     layer.visibilityChanged.connect(self.on_visibility_changed)
@@ -122,7 +102,7 @@ class PanRasters(QObject):
             self.raster_params[raster_name] = {func["name"]: deepcopy(func["params"]) for func in UTILITY_FUNCTIONS}
             self.current_utility_function[raster_name] = None
             self.weights[raster_name] = 1
-            self.set_minmax(raster_name, *get_file_minmax(raster.publicSource()))
+            self.set_minmax(raster_name, *self.get_file_minmax(raster_name, raster.publicSource()))
 
         for raster_name in self.rasters:
             if raster_name in [r.name() for r in map_layers.values()]:
@@ -254,3 +234,92 @@ class PanRasters(QObject):
         self.min[raster_name] = min_value
         self.max[raster_name] = max_value
         self.update_params_range(raster_name, min_value, max_value)
+
+    def get_file_minmax(self, raster_name, filename, force=True):
+        try:
+            dataset = Open(filename, GA_ReadOnly)
+        except Exception as e:
+            if "not recognized as a supported file format" in str(e):
+                self.iface.messageBar().pushMessage(
+                    f"{raster_name=}, {filename} is not a GDAL supported file format, remove the raster layer, and try again.",
+                    level=Qgis.Critical,
+                )
+            self.set_raster_deleted(raster_name, True)
+        if dataset is None:
+            raise FileNotFoundError(filename)
+        raster_band = dataset.GetRasterBand(1)
+        rmin = raster_band.GetMinimum()
+        rmax = raster_band.GetMaximum()
+        if not rmin or not rmax or force:
+            # start = time()
+            (rmin, rmax) = raster_band.ComputeRasterMinMax(True)
+            # QgsMessageLog.logMessage(
+            #     f"ComputeRasterMinMax took {time()-start} seconds {rmin=}, {rmax=}, {filename=}",
+            #     tag=TAG,
+            #     level=Qgis.Info,
+            # )
+        return rmin, rmax
+
+    def calculate_zonal_statistics(self, layer):
+        """Calculate zonal statistics for the rasters in the model."""
+        if not isinstance(layer, QgsVectorLayer):
+            QgsMessageLog.logMessage("Not QgsVectorLayer selected", tag=TAG, level=Qgis.Warning)
+            return
+        if layer.selectedFeatureCount() == 0:
+            QgsMessageLog.logMessage("No features selected", tag=TAG, level=Qgis.Warning)
+            return
+
+        tasks = []
+        for raster_name, raster in self.rasters.items():
+            if raster.isValid() and Path(raster.publicSource()).is_file():
+                task = QgsProcessingAlgRunnerTask(
+                    algorithm=QgsApplication.processingRegistry().algorithmById("native:zonalstatisticsfb"),
+                    parameters={
+                        "COLUMN_PREFIX": "_",
+                        "INPUT": QgsProcessingFeatureSourceDefinition(
+                            layer.publicSource(),
+                            selectedFeaturesOnly=True,
+                            featureLimit=-1,
+                            geometryCheck=QgsFeatureRequest.GeometryAbortOnInvalid,
+                        ),
+                        "INPUT_RASTER": raster,
+                        "OUTPUT": "TEMPORARY_OUTPUT",
+                        "RASTER_BAND": 1,
+                        "STATISTICS": [5, 6],
+                    },
+                    context=self.context,
+                )
+                task.executed.connect(partial(self.task_finished, raster_name=raster_name))
+                tasks.append(task)
+
+        for task in tasks:
+            QgsApplication.taskManager().addTask(task)
+
+    def task_finished(self, successful, results, raster_name):
+        if not successful:
+            QgsMessageLog.logMessage(f"Zonal Statistics finished badly for {raster_name}", tag=TAG, level=Qgis.Critical)
+        else:
+            QgsMessageLog.logMessage(f"Zonal Statistics finished good for {raster_name}", tag=TAG, level=Qgis.Success)
+            output_layer = self.context.getMapLayer(results["OUTPUT"])
+            if output_layer and output_layer.isValid():
+                was = self.get_minmax(raster_name)
+                min_ = float("inf")
+                max_ = -float("inf")
+                for feat in output_layer.getFeatures():
+                    min_ = min(feat["_min"], min_)
+                    max_ = max(feat["_max"], max_)
+                now = (min_, max_)
+                if isclose(was[0], min_, rel_tol=1e-3) and isclose(was[1], max_, rel_tol=1e-3):
+                    QgsMessageLog.logMessage(
+                        f"Min-max did not change >1e-3 for {raster_name}", tag=TAG, level=Qgis.Warning
+                    )
+                    return
+                self.set_minmax(raster_name, min_, max_)
+                self.visibilityChanged.emit(raster_name, True)  # Emit signal to update the view
+                QgsMessageLog.logMessage(
+                    f"Min-max {was=}, {now=}, over:{output_layer.featureCount()} features for {raster_name}",
+                    tag=TAG,
+                    level=Qgis.Info,
+                )
+            else:
+                QgsMessageLog.logMessage(f"Invalid output for {raster_name}", tag=TAG, level=Qgis.Critical)

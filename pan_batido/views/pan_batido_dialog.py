@@ -32,26 +32,36 @@
 import os
 from functools import partial
 
+from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer
 from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import Qt, QUrl
 from qgis.PyQt.QtGui import QDesktopServices
 
-from ..models.pan_rasters import PanRasters
 from ..views.param_widget import ParamWidget
 from ..views.param_widget_list import ParamWidgetList
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "pan_batido_dialog_base.ui"))
 
+from osgeo_utils.gdal_calc import GDALDataTypeNames
+
 from ..constants import UTILITY_FUNCTIONS
 
 
 class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
-    def __init__(self, parent=None):
+    def __init__(self, iface, model, parent=None):
         """Constructor."""
         super(MarraquetaDialog, self).__init__(parent)
+        self.iface = iface
+        self.model = model
+        self.selected_extent = None
+
         # Set up the user interface from Designer through FORM_CLASS.
         self.setupUi(self)
+
+        self.mQgsDoubleSpinBox_nodata.clear()
+        self.comboBox_datatype.addItems(list(map(str, GDALDataTypeNames)))
+        # self.comboBox_datatype.setCurrentIndex(self.comboBox_datatype.findText("Float32"))
 
         # Set up columns for treeWidget
         self.treeWidget.setColumnCount(4)
@@ -65,17 +75,36 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Reset).clicked.connect(self.reset)
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.apply)
 
-        # Initialize the model
-        self.model = PanRasters()
-
         # Connect the visibilityChanged signal to the handler method
         self.model.visibilityChanged.connect(self.on_visibility_changed)
+
+        # Connect the minMaxUpdated signal to the handler method
+        # self.model.minMaxUpdated.connect(self.on_min_max_updated)
 
         # Connect the itemChanged signal to a custom slot
         self.treeWidget.itemChanged.connect(self.on_item_changed)
 
         # Populate the UI with rasters and utility functions
         self.populate_rasters()
+
+        # Connect the extentsChanged signal to update the extent group box
+        self.setup_extent_group_box()
+        self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)
+
+    def setup_extent_group_box(self):
+        """Set up the QgsExtentGroupBox."""
+        extent = self.iface.mapCanvas().extent()
+        crs = QgsProject.instance().crs()
+
+        self.mExtentGroupBox.setOriginalExtent(extent, crs)
+        self.mExtentGroupBox.setCurrentExtent(extent, crs)
+        self.mExtentGroupBox.setOutputCrs(crs)
+
+    def handle_extent_change(self):
+        """Handle the extentsChanged signal from the map canvas."""
+        extent = self.iface.mapCanvas().extent()
+        crs = QgsProject.instance().crs()
+        self.mExtentGroupBox.setCurrentExtent(extent, crs)
 
     def populate_rasters(self):
         """Populate the UI with the list of rasters and utility functions."""
@@ -130,6 +159,26 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
             top_level_item = root.child(i)
             if top_level_item.text(0) == raster_name:
                 top_level_item.setCheckState(0, Qt.Checked if visible else Qt.Unchecked)
+                # ? copilot bad suggestion: Update the corresponding slider min max
+                # ? min_value, max_value = self.model.get_minmax(raster_name)
+                # ? self.update_slider_min_max(raster_name, min_value, max_value)
+                break
+
+    # def on_min_max_updated(self, raster_name, min_value, max_value):
+    #     """Handle the minMaxUpdated signal from the model."""
+    #     self.update_slider_min_max(raster_name, min_value, max_value)
+
+    def update_slider_min_max(self, raster_name, min_value, max_value):
+        """Update the slider min max values."""
+        root = self.treeWidget.invisibleRootItem()
+        child_count = root.childCount()
+        for i in range(child_count):
+            top_level_item = root.child(i)
+            if top_level_item.text(0) == raster_name:
+                param_widget_list = self.treeWidget.itemWidget(top_level_item, 3)
+                if param_widget_list:
+                    for param_widget in param_widget_list.param_widgets:
+                        param_widget.setRange(min_value, max_value)
                 break
 
     def on_utility_function_changed(self, index, combo, tree_item):
@@ -209,3 +258,30 @@ class MarraquetaDialog(QtWidgets.QDialog, FORM_CLASS):
             weight = self.model.get_weight(raster_name)
             weight_widget = self.treeWidget.itemWidget(top_level_item, 1)
             weight_widget.setValue(weight)
+
+        # Calculate zonal statistics for selected features
+        layer = self.iface.activeLayer()
+        if isinstance(layer, QgsVectorLayer) and layer.selectedFeatureCount() > 0:
+            self.model.calculate_zonal_statistics(layer)
+            if layer.selectedFeatureCount() == 1:
+                extent = layer.selectedFeatures()[0].geometry().boundingBox()
+            else:
+                min_x = float("inf")
+                max_x = -float("inf")
+                min_y = float("inf")
+                max_y = -float("inf")
+
+                for feat in layer.selectedFeatures():
+                    bbox = feat.geometry().boundingBox()
+                    min_x = min(bbox.xMinimum(), min_x)
+                    max_x = max(bbox.xMaximum(), max_x)
+                    min_y = min(bbox.yMinimum(), min_y)
+                    max_y = max(bbox.yMaximum(), max_y)
+
+                extent = QgsRectangle(min_x, min_y, max_x, max_y)
+
+            crs = QgsProject.instance().crs()
+            # self.mExtentGroupBox.setCurrentExtent(extent, crs)
+            self.mExtentGroupBox.setOutputExtentFromUser(extent, crs)
+            # trigger  void extentChanged(const QgsRectangle& r) signal
+            # self.mExtentGroupBox.extentChanged.emit(extent)

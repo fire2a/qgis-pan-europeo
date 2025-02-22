@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>649</width>
+    <width>656</width>
     <height>568</height>
    </rect>
   </property>
@@ -69,6 +69,22 @@
         </property>
        </widget>
       </item>
+      <item row="0" column="1">
+       <widget class="QgsDoubleSpinBox" name="mQgsDoubleSpinBox_nodata">
+        <property name="specialValueText">
+         <string>Not set</string>
+        </property>
+        <property name="minimum">
+         <double>-10000000000000000.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>10000000000000000.000000000000000</double>
+        </property>
+        <property name="expressionsEnabled">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_2">
         <property name="text">
@@ -76,11 +92,15 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QgsDoubleSpinBox" name="mQgsDoubleSpinBox"/>
-      </item>
       <item row="1" column="1">
-       <widget class="QComboBox" name="comboBox"/>
+       <widget class="QComboBox" name="comboBox_datatype">
+        <property name="currentText">
+         <string/>
+        </property>
+        <property name="placeholderText">
+         <string>Not set</string>
+        </property>
+       </widget>
       </item>
       <item row="2" column="1">
        <widget class="QgsExtentGroupBox" name="mExtentGroupBox">
