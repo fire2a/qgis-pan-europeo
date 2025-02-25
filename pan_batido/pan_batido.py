@@ -39,11 +39,11 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
 from .constants import TAG
-from .models.pan_rasters import PanRasters
+from .models.model import Model
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
 # Import the code for the dialog
-from .views.pan_batido_dialog import MarraquetaDialog
+from .views.view import Dialog
 
 
 class Marraqueta:
@@ -197,8 +197,8 @@ class Marraqueta:
             self.first_start = False
             self.context = QgsProcessingContext()
             self.context.setProject(QgsProject.instance())
-            self.model = PanRasters(self.iface, self.context)
-            self.dlg = MarraquetaDialog(self.iface, self.model)
+            self.model = Model()  # PanRasters(self.iface, self.context)
+            self.dlg = Dialog(iface=self.iface, model=self.model)
             print("===Dialog created===")
         else:
             self.dlg.populate_rasters()
@@ -211,12 +211,12 @@ class Marraqueta:
         if result:
             print("===OK was pressed===")
             QgsMessageLog.logMessage("OK was pressed", tag=TAG, level=Qgis.Info)
-            self.model.print_current_params()
-            self.doit(self.model, self.dlg)
+            # self.model.print_current_params()
+            # self.doit(self.model, self.dlg)
 
         else:
             print("===else than OK===")
-            self.dlg.model.print_all_params()
+            # self.dlg.model.print_all_params()
 
     def doit(self, model, view):
         """
