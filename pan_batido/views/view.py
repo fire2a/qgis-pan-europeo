@@ -29,6 +29,16 @@ from qgis.PyQt.QtCore import QSize, Qt
 
 from .double_spin_slider import DoubleSpinSlider
 
+
+def breakit():
+    # fmt: off
+    from IPython.terminal.embed import InteractiveShellEmbed
+    from qgis.PyQt.QtCore import pyqtRemoveInputHook
+    pyqtRemoveInputHook()
+    # fmt: on
+    return InteractiveShellEmbed()
+
+
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "dialog.ui"))
 
@@ -50,9 +60,12 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):
         self.tree.setItemDelegateForColumn(3, UtilityFuncComboBoxDelegate(self))
         self.tree.setItemDelegateForColumn(4, SliderListDelegate(self))
 
-        # self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.complete)
+        self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(lambda: self.on_apply())
         # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.delete)
         # self.button_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.add)
+
+    def on_apply(self):
+        self.model.balance_weights()
 
 
 class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):

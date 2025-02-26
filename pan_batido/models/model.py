@@ -63,7 +63,6 @@ class Model(QtCore.QAbstractItemModel):
         super().__init__(*args, **kwargs)
         self.iface = iface
         self.context = context
-        print(f"{self.iface=}, {self.context=}")
         self.layers = []
         self.load_layers()
         QgsProject.instance().layersRemoved.connect(self.on_layers_removed)
@@ -187,10 +186,12 @@ class Model(QtCore.QAbstractItemModel):
     def save(self):
         # with open(Path(__file__).parent / "data.db", "w") as f:
         #     json.dump([cattr_to_dict(layer) for layer in self.layers], f)
-        from pprint import pprint
+        # from pprint import pprint
 
         for layer in self.layers:
-            pprint(layer.name, layer.util_funcs)
+            print(layer.name, layer.weight)
+            # for uf in layer.util_funcs:
+            #     pprint(uf)
 
     def load_layers(self):
         for lid, layer in QgsProject.instance().mapLayers().items():
@@ -371,6 +372,15 @@ class Model(QtCore.QAbstractItemModel):
         QgsMessageLog.logMessage(
             f"{pre_msg} finished successfully, new {min_=}, {max_=}, {any_change=}", tag=TAG, level=Qgis.Info
         )
+
+    def balance_weights(self):
+        total = sum(layer.weight for layer in self.layers if layer.visibility) / 100
+        for i, layer in enumerate(self.layers):
+            if layer.visibility:
+                layer.weight /= total
+                self.dataChanged.emit(self.index(i, 2), self.index(i, 2), [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+        self.layoutChanged.emit()
+        self.save()
 
 
 def get_file_minmax(filename, force=True):
