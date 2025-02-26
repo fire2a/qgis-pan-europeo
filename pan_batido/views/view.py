@@ -21,13 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
-
 import os
+from functools import partial
 
 from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import QSize, Qt
 
-# from ..model import Model
 from .double_spin_slider import DoubleSpinSlider
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
@@ -48,7 +47,8 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):
         self.tree.setModel(self.model)
         self.tree.setEditTriggers(QtWidgets.QAbstractItemView.AllEditTriggers)
         self.tree.setItemDelegateForColumn(2, WeightDoubleSpinSliderDelegate(self))
-        # self.tree.setItemDelegateForColumn(3, DoubleSpinSliderDelegate(self))
+        self.tree.setItemDelegateForColumn(3, UtilityFuncComboBoxDelegate(self))
+        self.tree.setItemDelegateForColumn(4, SliderListDelegate(self))
 
         # self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.complete)
         # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.delete)
@@ -91,14 +91,14 @@ class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
             del slider
             # widget.render(painter, window_top_left)
             # pt = painter.deviceTransform().map(option.rect.topLeft())
-            print(
-                f"weight:paint: {index.row()} t w r p",
-                tree_top_left,
-                window_top_left,
-                option.rect.topLeft(),
-                #     pt,
-                sep="\n",
-            )
+            # print(
+            #     f"weight:paint: {index.row()} t w r p",
+            #     tree_top_left,
+            #     window_top_left,
+            #     option.rect.topLeft(),
+            #     #     pt,
+            #     sep="\n",
+            # )
         else:
             super().paint(painter, option, index)
 
@@ -106,385 +106,128 @@ class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
         return QSize(200, 40)
 
 
-"""
-
-class SliderDelegate(QtWidgets.QStyledItemDelegate):
+class UtilityFuncComboBoxDelegate(QtWidgets.QStyledItemDelegate):
     def createEditor(self, parent, option, index):
-        slider = QtWidgets.QSlider(Qt.Horizontal, parent)
-        slider.setMinimum(0)
-        slider.setMaximum(100)
-        slider.sliderReleased.connect(lambda idx=index: self.on_slider_released(idx))
-        return slider
+        # print(f"ComboBoxDelegate:createEditor: {index.row()=}, {index.column()=}")
+        model = index.model()
+        editor = QtWidgets.QComboBox(parent=parent)
+        data = model.data(index, Qt.EditRole)
+        for item in data["cb"]:
+            editor.addItem(item["description"], item)
+        editor.setCurrentIndex(data["idx"])
+        editor.currentIndexChanged.connect(partial(self.commitAndCloseEditor, editor))
+        return editor
 
     def setEditorData(self, editor, index):
-        value = index.model().data(index, Model.SliderRole)
-        print(f"SliderDelegate:setEditorData: {value=}")
-        min_, val, max_ = value
-        editor.setMinimum(min_)
-        editor.setMaximum(max_)
-        editor.setValue(val)
+        # print(f"ComboBoxDelegate:setEditorData: {index.row()=}, {index.column()=}")
+        value = index.model().data(index, Qt.EditRole)
+        editor.setCurrentIndex(editor.findData(value))
 
     def setModelData(self, editor, model, index):
-        model.setData(index, (editor.minimum(), editor.value(), editor.maximum()), Model.SliderRole)
+        # print(f"ComboBoxDelegate:setModelData: {index.row()=}, {index.column()=}")
+        value = {"cb": [editor.itemData(i) for i in range(len(editor))], "idx": editor.currentIndex()}
+        model.setData(index, value, Qt.EditRole)
 
-    def on_slider_released(self, index):
-        slider = self.sender()
-        value = slider.value()
-        min_ = slider.minimum()
-        max_ = slider.maximum()
-        model = index.model()
-        model.setData(index, (min_, value, max_), Model.SliderRole)
+    def commitAndCloseEditor(self, editor):
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
+
+    def sizeHint(self, option, index):
+        return QSize(200, 40)
 
     def paint(self, painter, option, index):
-        value = index.model().data(index, Model.SliderRole)
-        min_, val, max_ = value
-
-        # Create a QStyleOptionSlider and initialize it
-        opt = QtWidgets.QStyleOptionSlider()
-        opt.rect = option.rect
-        opt.minimum = min_
-        opt.maximum = max_
-        opt.sliderPosition = val
-        opt.sliderValue = val
-        opt.orientation = Qt.Horizontal
-        opt.state = option.state | QtWidgets.QStyle.State_Enabled
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove | QtWidgets.QStyle.SC_SliderHandle
-
-        # Use the existing QPainter to draw the slider
-        style = option.widget.style() if option.widget else QtWidgets.QApplication.style()
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, option.widget)
-
-
-class DoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
-    def createEditor(self, parent, option, index):
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        min_, val, max_ = value
-        widget = DoubleSpinSlider(parent=parent, min=min_, value=val, max=max_)
-        widget.sliderReleased.connect(lambda idx=index: self.on_slider_released(idx))
-        return widget
-
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        print(f"DoubleSpinSliderDelegate:setEditorData: {value=}")
-        editor.set3(*value)
-
-    def setModelData(self, editor, model, index):
-        model.setData(index, editor.get3(), Model.DoubleSpinSliderRole)
-
-    def on_slider_released(self, index):
-        slider = self.sender()
-        model = index.model()
-        model.setData(index, slider.get3(), Model.DoubleSpinSliderRole)
-
-    def nope0(self):
-        # fmt: off
-        from qgis.PyQt.QtCore import pyqtRemoveInputHook
-        pyqtRemoveInputHook()
-        from IPython.terminal.embed import InteractiveShellEmbed
-        InteractiveShellEmbed()()
-        # fmt: on
-
-    def nope4(self, painter, option, index):
-
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        print(f"DoubleSpinSliderDelegate:paint: {value=}")
-        min_, val, max_ = value
-
-        # Create a QStyleOptionViewItem and initialize it
-        options = QtWidgets.QStyleOptionViewItem(option)
-        self.initStyleOption(options, index)
-
-        if options.widget:  # <PyQt5.QtWidgets.QTreeView at 0x7fe7a3e248b0>
-            style = options.widget.style()
+        # disp = index.model().data(index, Qt.DisplayRole) ALWAYS NULL ?? incluso con model.setData DisplayRole ?
+        # edit = index.model().data(index, Qt.EditRole)
+        # print(f"ComboBoxDelegate:print: {index.row()=}, {index.column()=}, {disp=}, {edit=}")
+        if value := index.model().data(index, Qt.EditRole):
+            idx = value["idx"]
+            description = value["cb"][idx]["description"]
+            combo = QtWidgets.QComboBox(parent=self.parent().tree)
+            combo.addItem(description)
+            combo.setGeometry(option.rect)
+            tree = self.parent().tree
+            tree_top_left = tree.viewport().mapTo(tree, option.rect.topLeft())
+            window_top_left = tree.mapTo(tree.window(), tree_top_left)
+            combo.render(painter, window_top_left)
+            del combo
         else:
-            style = QtWidgets.QApplication.style()
+            super().paint(painter, option, index)
 
-        style.drawControl(QtWidgets.QStyle.CE_ItemViewItem, options, painter)
 
-    def nope2(self):
-        # Create and configure the DoubleSpinSlider
-        double_spin_slider = DoubleSpinSlider()
-        double_spin_slider.set3(min_, val, max_)
-        double_spin_slider.setGeometry(option.rect)
-
-        # Render the DoubleSpinSlider
-        painter.save()
-        painter.translate(option.rect.topLeft())
-        painter.setClipRect(option.rect.translated(-option.rect.topLeft()))
-        double_spin_slider.render(painter)
-        painter.restore()
-
-    def nope1(self):
-
-        opt = QtWidgets.QStyleOptionSpinBox
-
-        opt = QtWidgets.QStyleOptionSpinBox
-        opt.rect = option.rect
-        opt.minimum = min_
-        opt.maximum = max_
-
-        # Create a QStyleOptionSlider and initialize it
-        opt = QtWidgets.QStyleOptionSlider()
-        opt.rect = option.rect
-        opt.minimum = min_
-        opt.maximum = max_
-        opt.sliderPosition = val
-        opt.sliderValue = val
-        opt.orientation = Qt.Horizontal
-        opt.state = option.state | QtWidgets.QStyle.State_Enabled
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove | QtWidgets.QStyle.SC_SliderHandle
-
-        # Use the existing QPainter to draw the slider
-        style = option.widget.style() if option.widget else QtWidgets.QApplication.style()
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, option.widget)
-
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, option, painter, options.widget)
-
-    def paint(self, painter, option, index):
-
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        print(f"DoubleSpinSliderDelegate:paint: {value=}")
-        min_, val, max_ = value
-
-        double_spin_slider = DoubleSpinSlider()
-        double_spin_slider.set3(min_, val, max_)
-        double_spin_slider.setGeometry(option.rect)
-        double_spin_slider.render(painter, option.rect.topLeft())
-
-    def nope5(self):
-        # Create a QWidget to contain both QDoubleSpinBox and QSlider
-        container = QtWidgets.QWidget()
-        layout = QtWidgets.QHBoxLayout(container)
+class SliderListDelegate(QtWidgets.QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        sliders = index.model().data(index, Qt.EditRole)
+        editor = QtWidgets.QWidget(parent=parent)
+        editor.setAttribute(Qt.WA_TranslucentBackground)
+        layout = QtWidgets.QVBoxLayout(editor)
         layout.setContentsMargins(0, 0, 0, 0)
-
-        # Create and configure the QDoubleSpinBox
-        spin_box = QtWidgets.QDoubleSpinBox()
-        spin_box.setRange(min_, max_)
-        spin_box.setValue(val)
-        layout.addWidget(spin_box)
-
-        # Create and configure the QSlider
-        slider = DoubleSlider(orientation=Qt.Horizontal)
-        slider.setMinimum(min_)
-        slider.setMaximum(max_)
-        slider.setValue(val)
-        layout.addWidget(slider)
-
-        # Render the container widget
-        container.setGeometry(option.rect)
-        container.render(painter, option.rect.topLeft())
-
-    def nope4(self):
-        pass
-        #     # Create a QWidget to contain both QDoubleSpinBox and QSlider
-        #     container = QtWidgets.QWidget()
-        #     layout = QtWidgets.QHBoxLayout(container)
-        #     layout.setContentsMargins(0, 0, 0, 0)
-
-        #     # Create and configure the QDoubleSpinBox
-        #     spin_box = QtWidgets.QDoubleSpinBox()
-        #     spin_box.setRange(min_, max_)
-        #     spin_box.setValue(val)
-        #     layout.addWidget(spin_box)
-
-        #     # Create and configure the QSlider
-        #     slider = DoubleSlider(orientation=Qt.Horizontal)
-        #     slider.setMinimum(min_)
-        #     slider.setMaximum(max_)
-        #     slider.setValue(val)
-        #     layout.addWidget(slider)
-
-        #     # Render the container widget
-        #     container.setGeometry(option.rect)
-        #     container.render(painter, option.rect.topLeft())
-
-class SliderDelegate(QtWidgets.QStyledItemDelegate):
-    def createEditor(self, parent, option, index):
-        slider = QtWidgets.QSlider(Qt.Horizontal, parent)
-        slider.setMinimum(0)
-        slider.setMaximum(100)
-        slider.sliderReleased.connect(lambda idx=index: self.on_slider_released(idx))
-        return slider
+        for slidx, (text, min_, val, max_) in enumerate(sliders):
+            slider = DoubleSpinSlider(parent=editor)
+            slider.set3(min_, val, max_)
+            slider.setText(text)
+            slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
+            layout.addWidget(slider)
+        return editor
 
     def setEditorData(self, editor, index):
-        value = index.model().data(index, Model.SliderRole)
-        print(f"SliderDelegate:setEditorData: {value=}")
-        min_, val, max_ = value
-        editor.setMinimum(min_)
-        editor.setMaximum(max_)
-        editor.setValue(val)
+        sliders = index.model().data(index, Qt.EditRole)
+        for i, slider in enumerate(editor.findChildren(DoubleSpinSlider)):
+            text, min_, val, max_ = sliders[i]
+            slider.set3(min_, val, max_)
+            slider.setText(text)
 
     def setModelData(self, editor, model, index):
-        model.setData(index, (editor.minimum(), editor.value(), editor.maximum()), Model.SliderRole)
+        sliders = []
+        for slider in editor.findChildren(DoubleSpinSlider):
+            text = slider.text()
+            min_ = slider.minimum()
+            val = slider.value()
+            max_ = slider.maximum()
+            sliders.append((text, min_, val, max_))
+        model.setData(index, sliders, Qt.EditRole)
 
-    def on_slider_released(self, index):
-        slider = self.sender()
-        value = slider.value()
-        min_ = slider.minimum()
-        max_ = slider.maximum()
+    def on_value_changed(self, value, index, slidx):
         model = index.model()
-        model.setData(index, (min_, value, max_), Model.SliderRole)
+        sliders = model.data(index, Qt.EditRole)
+        sliders[slidx] = (sliders[slidx][0], sliders[slidx][1], value, sliders[slidx][3])
+        model.setData(index, sliders, Qt.EditRole)
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
+
+    def sizeHint(self, option, index):
+        sliders = index.model().data(index, Qt.EditRole)
+        return QSize(100, 40 * len(sliders))
 
     def paint(self, painter, option, index):
-        value = index.model().data(index, Model.SliderRole)
-        min_, val, max_ = value
+        if sliders := index.model().data(index, Qt.EditRole):
+            print(f"SliderListDelegate:print: {index.row()}, {index.column()} {sliders=}")
+            tree = self.parent().tree
+            editor = QtWidgets.QWidget(parent=tree)
+            editor.setAttribute(Qt.WA_TranslucentBackground)
+            layout = QtWidgets.QVBoxLayout(editor)
+            layout.setContentsMargins(0, 0, 0, 0)
+            for slidx, (text, min_, val, max_) in enumerate(sliders):
+                slider = DoubleSpinSlider()
+                slider.setRange(min_, max_)
+                slider.setValue(val)
+                slider.setText(text)
+                slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
+                layout.addWidget(slider)
 
-        # Create a QStyleOptionSlider and initialize it
-        opt = QtWidgets.QStyleOptionSlider()
-        opt.rect = option.rect
-        opt.minimum = min_
-        opt.maximum = max_
-        opt.sliderPosition = val
-        opt.sliderValue = val
-        opt.orientation = Qt.Horizontal
-        opt.state = option.state | QtWidgets.QStyle.State_Enabled
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove | QtWidgets.QStyle.SC_SliderHandle
-
-        # Use the existing QPainter to draw the slider
-        style = option.widget.style() if option.widget else QtWidgets.QApplication.style()
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, option.widget)
-
-
-class DoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
-    def createEditor(self, parent, option, index):
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        min_, val, max_ = value
-        widget = DoubleSpinSlider(parent=parent, min=min_, value=val, max=max_)
-        widget.sliderReleased.connect(lambda idx=index: self.on_slider_released(idx))
-        return widget
-
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        print(f"DoubleSpinSliderDelegate:setEditorData: {value=}")
-        editor.set3(*value)
-
-    def setModelData(self, editor, model, index):
-        model.setData(index, editor.get3(), Model.DoubleSpinSliderRole)
-
-    def on_slider_released(self, index):
-        slider = self.sender()
-        model = index.model()
-        model.setData(index, slider.get3(), Model.DoubleSpinSliderRole)
-
-    def nope0(self):
-        # fmt: off
-        from qgis.PyQt.QtCore import pyqtRemoveInputHook
-        pyqtRemoveInputHook()
-        from IPython.terminal.embed import InteractiveShellEmbed
-        InteractiveShellEmbed()()
-        # fmt: on
-
-    def nope4(self, painter, option, index):
-
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        print(f"DoubleSpinSliderDelegate:paint: {value=}")
-        min_, val, max_ = value
-
-        # Create a QStyleOptionViewItem and initialize it
-        options = QtWidgets.QStyleOptionViewItem(option)
-        self.initStyleOption(options, index)
-
-        if options.widget:  # <PyQt5.QtWidgets.QTreeView at 0x7fe7a3e248b0>
-            style = options.widget.style()
+            tree_top_left = tree.viewport().mapTo(tree, option.rect.topLeft())
+            window_top_left = tree.mapTo(tree.window(), tree_top_left)
+            # pt = painter.deviceTransform().map(option.rect.topLeft())
+            editor.setGeometry(option.rect)
+            editor.render(
+                painter,
+                window_top_left,
+                # QRegion(0, 0, option.rect.width(), option.rect.height()),
+                # QtWidgets.QWidget.RenderFlag.DrawChildren,
+            )
+            del editor
         else:
-            style = QtWidgets.QApplication.style()
-
-        style.drawControl(QtWidgets.QStyle.CE_ItemViewItem, options, painter)
-
-    def nope2(self):
-        # Create and configure the DoubleSpinSlider
-        double_spin_slider = DoubleSpinSlider()
-        double_spin_slider.set3(min_, val, max_)
-        double_spin_slider.setGeometry(option.rect)
-
-        # Render the DoubleSpinSlider
-        painter.save()
-        painter.translate(option.rect.topLeft())
-        painter.setClipRect(option.rect.translated(-option.rect.topLeft()))
-        double_spin_slider.render(painter)
-        painter.restore()
-
-    def nope1(self):
-
-        opt = QtWidgets.QStyleOptionSpinBox
-
-        opt = QtWidgets.QStyleOptionSpinBox
-        opt.rect = option.rect
-        opt.minimum = min_
-        opt.maximum = max_
-
-        # Create a QStyleOptionSlider and initialize it
-        opt = QtWidgets.QStyleOptionSlider()
-        opt.rect = option.rect
-        opt.minimum = min_
-        opt.maximum = max_
-        opt.sliderPosition = val
-        opt.sliderValue = val
-        opt.orientation = Qt.Horizontal
-        opt.state = option.state | QtWidgets.QStyle.State_Enabled
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove | QtWidgets.QStyle.SC_SliderHandle
-
-        # Use the existing QPainter to draw the slider
-        style = option.widget.style() if option.widget else QtWidgets.QApplication.style()
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, option.widget)
-
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, option, painter, options.widget)
-
-    def paint(self, painter, option, index):
-
-        value = index.model().data(index, Model.DoubleSpinSliderRole)
-        print(f"DoubleSpinSliderDelegate:paint: {value=}")
-        min_, val, max_ = value
-
-        double_spin_slider = DoubleSpinSlider()
-        double_spin_slider.set3(min_, val, max_)
-        double_spin_slider.setGeometry(option.rect)
-        double_spin_slider.render(painter, option.rect.topLeft())
-
-    def nope5(self):
-        # Create a QWidget to contain both QDoubleSpinBox and QSlider
-        container = QtWidgets.QWidget()
-        layout = QtWidgets.QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Create and configure the QDoubleSpinBox
-        spin_box = QtWidgets.QDoubleSpinBox()
-        spin_box.setRange(min_, max_)
-        spin_box.setValue(val)
-        layout.addWidget(spin_box)
-
-        # Create and configure the QSlider
-        slider = DoubleSlider(orientation=Qt.Horizontal)
-        slider.setMinimum(min_)
-        slider.setMaximum(max_)
-        slider.setValue(val)
-        layout.addWidget(slider)
-
-        # Render the container widget
-        container.setGeometry(option.rect)
-        container.render(painter, option.rect.topLeft())
-
-    def nope4(self):
-        pass
-        #     # Create a QWidget to contain both QDoubleSpinBox and QSlider
-        #     container = QtWidgets.QWidget()
-        #     layout = QtWidgets.QHBoxLayout(container)
-        #     layout.setContentsMargins(0, 0, 0, 0)
-
-        #     # Create and configure the QDoubleSpinBox
-        #     spin_box = QtWidgets.QDoubleSpinBox()
-        #     spin_box.setRange(min_, max_)
-        #     spin_box.setValue(val)
-        #     layout.addWidget(spin_box)
-
-        #     # Create and configure the QSlider
-        #     slider = DoubleSlider(orientation=Qt.Horizontal)
-        #     slider.setMinimum(min_)
-        #     slider.setMaximum(max_)
-        #     slider.setValue(val)
-        #     layout.addWidget(slider)
-
-        #     # Render the container widget
-        #     container.setGeometry(option.rect)
-        #     container.render(painter, option.rect.topLeft())
-"""
+            super().paint(painter, option, index)

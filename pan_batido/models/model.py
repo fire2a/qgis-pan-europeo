@@ -1,5 +1,6 @@
 #!python
 """
+qgis
 # fmt: off
 from qgis.PyQt.QtCore import pyqtRemoveInputHook
 pyqtRemoveInputHook()
@@ -13,12 +14,23 @@ InteractiveShellEmbed()()
 import json
 from pathlib import Path
 
-from attrs import asdict, define
+from attrs import define, field
 from cattrs import structure, unstructure
 from osgeo.gdal import GA_ReadOnly, Open
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
 from qgis.core import QgsProject, QgsRasterLayer
+
+from ..constants import UTILITY_FUNCTIONS
+
+
+def breakit():
+    # fmt: off
+    from IPython.terminal.embed import InteractiveShellEmbed
+    from qgis.PyQt.QtCore import pyqtRemoveInputHook
+    pyqtRemoveInputHook()
+    # fmt: on
+    return InteractiveShellEmbed()
 
 
 def dict_to_cattr(data: dict, cls: type) -> object:
@@ -35,8 +47,10 @@ class Layer:
     visibility: bool = False
     name: str = ""
     weight: float = 1.0
-    min: float = None
-    max: float = None
+    min: float | None = None
+    max: float | None = None
+    util_funcs: list[dict] = field(factory=lambda: UTILITY_FUNCTIONS.copy())
+    uf_idx: int = 0  # CURRENTLY SELECTED utility function index
 
 
 class Model(QtCore.QAbstractItemModel):
@@ -79,19 +93,28 @@ class Model(QtCore.QAbstractItemModel):
 
         if role == Qt.CheckStateRole and column == 0:
             return Qt.Checked if layer.visibility else Qt.Unchecked
-        if role == Qt.DisplayRole:
-            if index.column() == 1:
-                return layer.name
-            if index.column() in [3, 4]:
-                return f"Hola {row}, {column}"
+        if role == Qt.DisplayRole and column == 1:
+            # print(f"Model:data: ({row}, {column}), {layer.name=}")
+            return layer.name
         if role == Qt.EditRole and column == 2:
+            # print(f"Model:data: ({row}, {column}), {layer.weight=}")
             return layer.weight
+        if role == Qt.EditRole and column == 3:
+            # TODO cambiar min max
+            # print(f"Model:data: ({row}, {column}), {len(layer.util_funcs)=} {layer.uf_idx=}")
+            return {"cb": layer.util_funcs, "idx": layer.uf_idx}
+        if role == Qt.EditRole and column == 4:
+            sliders = [
+                (text, values["min"], values["value"], values["max"])
+                for text, values in layer.util_funcs[layer.uf_idx]["params"].items()
+            ]
+            # print(f"Model:data: ({row}, {column}), {sliders=}")
+            return sliders
 
         return QVariant()
 
     def setData(self, index, value, role):
         row, column = index.row(), index.column()
-        print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
         if role == Qt.CheckStateRole and column == 0:
             lid = self.layers[row].id
             if QgsProject.instance().layerTreeRoot().findLayer(lid):
@@ -105,14 +128,24 @@ class Model(QtCore.QAbstractItemModel):
             self.dataChanged.emit(index, index)
             self.save()
             return True
-        # if role == self.DoubleSpinSliderRole and index.column() == 3:
-        #     min_, val, max_ = value
-        #     self.layers[index.row()].fmin = min_
-        #     self.layers[index.row()].fval = val
-        #     self.layers[index.row()].fmax = max_
-        #     self.dataChanged.emit(index, index)
-        #     self.save()
-        #     return True
+        if role == Qt.EditRole and column == 3:
+            # print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
+            layer = self.layers[index.row()]
+            layer.util_funcs = value["cb"]
+            layer.uf_idx = value["idx"]
+            self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+            self.save()
+            return True
+        if role == Qt.EditRole and column == 4:
+            print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
+            # breakit()()
+            layer = self.layers[index.row()]
+            for slider in value:
+                param_name, _, val, _ = slider
+                layer.util_funcs[layer.uf_idx]["params"][param_name]["value"] = val
+            self.dataChanged.emit(index, index)
+            self.save()
+            return True
         return False
 
     def flags(self, index):
@@ -145,8 +178,12 @@ class Model(QtCore.QAbstractItemModel):
             self.layers = []
 
     def save(self):
-        with open(Path(__file__).parent / "data.db", "w") as f:
-            json.dump([asdict(layer) for layer in self.layers], f)
+        pass
+        # with open(Path(__file__).parent / "data.db", "w") as f:
+        #     json.dump([cattr_to_dict(layer) for layer in self.layers], f)
+        # from pprint import pprint
+        # for layer in self.layers:
+        #     pprint(layer)
 
     def load_layers(self):
         for lid, layer in QgsProject.instance().mapLayers().items():

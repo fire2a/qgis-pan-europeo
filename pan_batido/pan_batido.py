@@ -201,7 +201,7 @@ class Marraqueta:
             self.dlg = Dialog(iface=self.iface, model=self.model)
             print("===Dialog created===")
         else:
-            self.dlg.populate_rasters()
+            print("===Dialog already===")
 
         # show the dialog
         self.dlg.show()
