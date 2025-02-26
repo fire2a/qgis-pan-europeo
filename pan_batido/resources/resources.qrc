@@ -1,6 +1,5 @@
 <RCC>
     <qresource prefix="/plugins/pan_batido/resources" >
-        <file>marraqueta.svg</file>
-        <file>europe_icon.png</file>
+        <file>icon.png</file>
     </qresource>
 </RCC>
