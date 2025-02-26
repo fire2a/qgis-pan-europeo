@@ -24,8 +24,8 @@
 import os
 from functools import partial
 
-from qgis.PyQt import QtWidgets, uic
-from qgis.PyQt.QtCore import QSize, Qt
+from qgis.PyQt import QtWidgets, uic  # type: ignore
+from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
 
 from .double_spin_slider import DoubleSpinSlider
 
@@ -33,7 +33,7 @@ from .double_spin_slider import DoubleSpinSlider
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "dialog.ui"))
 
 
-class Dialog(QtWidgets.QDialog, FORM_CLASS):
+class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
     def __init__(self, parent=None, iface=None, model=None):
         """Constructor."""
         super().__init__(parent)
@@ -50,7 +50,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):
         self.tree.setItemDelegateForColumn(3, UtilityFuncComboBoxDelegate(self))
         self.tree.setItemDelegateForColumn(4, SliderListDelegate(self))
 
-        # self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.complete)
+        # self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(lambda: self.model.save())
         # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.delete)
         # self.button_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.add)
 
@@ -108,24 +108,23 @@ class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
 
 class UtilityFuncComboBoxDelegate(QtWidgets.QStyledItemDelegate):
     def createEditor(self, parent, option, index):
-        # print(f"ComboBoxDelegate:createEditor: {index.row()=}, {index.column()=}")
-        model = index.model()
+        print(f"ComboBoxDelegate:createEditor: {index.row()=}, {index.column()=}")
         editor = QtWidgets.QComboBox(parent=parent)
-        data = model.data(index, Qt.EditRole)
-        for item in data["cb"]:
-            editor.addItem(item["description"], item)
-        editor.setCurrentIndex(data["idx"])
+        data = index.model().data(index, Qt.EditRole)
+        for i, description in enumerate(data["descriptions"]):
+            editor.addItem(description, i)
+        editor.setCurrentIndex(data["index"])
         editor.currentIndexChanged.connect(partial(self.commitAndCloseEditor, editor))
         return editor
 
     def setEditorData(self, editor, index):
-        # print(f"ComboBoxDelegate:setEditorData: {index.row()=}, {index.column()=}")
-        value = index.model().data(index, Qt.EditRole)
-        editor.setCurrentIndex(editor.findData(value))
+        print(f"ComboBoxDelegate:setEditorData: {index.row()=}, {index.column()=}")
+        data = index.model().data(index, Qt.EditRole)
+        editor.setCurrentIndex(data["index"])
 
     def setModelData(self, editor, model, index):
-        # print(f"ComboBoxDelegate:setModelData: {index.row()=}, {index.column()=}")
-        value = {"cb": [editor.itemData(i) for i in range(len(editor))], "idx": editor.currentIndex()}
+        print(f"ComboBoxDelegate:setModelData: {index.row()=}, {index.column()=}")
+        value = editor.currentIndex()
         model.setData(index, value, Qt.EditRole)
 
     def commitAndCloseEditor(self, editor):
@@ -139,22 +138,17 @@ class UtilityFuncComboBoxDelegate(QtWidgets.QStyledItemDelegate):
         return QSize(200, 40)
 
     def paint(self, painter, option, index):
-        # disp = index.model().data(index, Qt.DisplayRole) ALWAYS NULL ?? incluso con model.setData DisplayRole ?
-        # edit = index.model().data(index, Qt.EditRole)
         # print(f"ComboBoxDelegate:print: {index.row()=}, {index.column()=}, {disp=}, {edit=}")
-        if value := index.model().data(index, Qt.EditRole):
-            idx = value["idx"]
-            description = value["cb"][idx]["description"]
-            combo = QtWidgets.QComboBox(parent=self.parent().tree)
-            combo.addItem(description)
-            combo.setGeometry(option.rect)
-            tree = self.parent().tree
-            tree_top_left = tree.viewport().mapTo(tree, option.rect.topLeft())
-            window_top_left = tree.mapTo(tree.window(), tree_top_left)
-            combo.render(painter, window_top_left)
-            del combo
-        else:
-            super().paint(painter, option, index)
+        data = index.model().data(index, Qt.EditRole)
+        description = data["descriptions"][data["index"]]
+        tree = self.parent().tree
+        combo = QtWidgets.QComboBox(parent=tree)
+        combo.addItem(description)
+        combo.setGeometry(option.rect)
+        tree_top_left = tree.viewport().mapTo(tree, option.rect.topLeft())
+        window_top_left = tree.mapTo(tree.window(), tree_top_left)
+        combo.render(painter, window_top_left)
+        del combo
 
 
 class SliderListDelegate(QtWidgets.QStyledItemDelegate):
@@ -168,8 +162,8 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
             slider = DoubleSpinSlider(parent=editor)
             slider.set3(min_, val, max_)
             slider.setText(text)
-            slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
             layout.addWidget(slider)
+            slider.sliderReleased.connect(partial(self.commitAndCloseEditor, editor))
         return editor
 
     def setEditorData(self, editor, index):
@@ -189,11 +183,9 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
             sliders.append((text, min_, val, max_))
         model.setData(index, sliders, Qt.EditRole)
 
-    def on_value_changed(self, value, index, slidx):
-        model = index.model()
-        sliders = model.data(index, Qt.EditRole)
-        sliders[slidx] = (sliders[slidx][0], sliders[slidx][1], value, sliders[slidx][3])
-        model.setData(index, sliders, Qt.EditRole)
+    def commitAndCloseEditor(self, editor):
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
 
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)

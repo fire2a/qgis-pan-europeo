@@ -17,10 +17,11 @@ from pathlib import Path
 
 from attrs import define, field
 from cattrs import structure, unstructure
-from osgeo.gdal import GA_ReadOnly, Open
+from osgeo.gdal import GA_ReadOnly, Open  # type: ignore
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
-from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsMessageLog, QgsProcessingAlgRunnerTask,
+from qgis.core import QgsMessageLog  # type: ignore
+from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsProcessingAlgRunnerTask,
                        QgsProcessingFeatureSourceDefinition, QgsProject, QgsRasterLayer, QgsVectorLayer)
 
 from ..constants import TAG, UTILITY_FUNCTIONS
@@ -63,7 +64,6 @@ class Model(QtCore.QAbstractItemModel):
         super().__init__(*args, **kwargs)
         self.iface = iface
         self.context = context
-        print(f"{self.iface=}, {self.context=}")
         self.layers = []
         self.load_layers()
         QgsProject.instance().layersRemoved.connect(self.on_layers_removed)
@@ -95,8 +95,8 @@ class Model(QtCore.QAbstractItemModel):
         if not index.isValid():
             return QVariant()
 
-        layer = self.layers[index.row()]
         row, column = index.row(), index.column()
+        layer = self.layers[row]
 
         if role == Qt.CheckStateRole and column == 0:
             return Qt.Checked if layer.visibility else Qt.Unchecked
@@ -107,7 +107,7 @@ class Model(QtCore.QAbstractItemModel):
             # print(f"Model:data: ({row}, {column}), {layer.weight=}")
             return layer.weight
         if role == Qt.EditRole and column == 3:
-            combo = {"cb": layer.util_funcs, "idx": layer.uf_idx}
+            combo = {"descriptions": [func["description"] for func in layer.util_funcs], "index": layer.uf_idx}
             print(f"Model:data: ({row}, {column}), {combo=}")
             return combo
         if role == Qt.EditRole and column == 4:
@@ -137,19 +137,20 @@ class Model(QtCore.QAbstractItemModel):
             return True
         if role == Qt.EditRole and column == 3:
             print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
-            layer = self.layers[index.row()]
-            layer.util_funcs = value["cb"]
-            layer.uf_idx = value["idx"]
-            self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+            self.layers[index.row()].uf_idx = value
+            dependent_index = self.index(row, 4)
+            self.dataChanged.emit(dependent_index, dependent_index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
             self.save()
             return True
         if role == Qt.EditRole and column == 4:
             print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
-            # breakit()()
             layer = self.layers[index.row()]
             for slider in value:
                 param_name, _, val, _ = slider
+                antes = layer.util_funcs[layer.uf_idx]["params"][param_name]["value"]
                 layer.util_funcs[layer.uf_idx]["params"][param_name]["value"] = val
+                ahora = layer.util_funcs[layer.uf_idx]["params"][param_name]["value"]
+                print(f"Model:setData: ({row}, {column}), {layer.name=}, {param_name=}, {antes=}, {ahora=}")
             self.dataChanged.emit(index, index)
             self.save()
             return True
@@ -187,10 +188,13 @@ class Model(QtCore.QAbstractItemModel):
     def save(self):
         # with open(Path(__file__).parent / "data.db", "w") as f:
         #     json.dump([cattr_to_dict(layer) for layer in self.layers], f)
-        from pprint import pprint
+        # from pprint import pprint
 
-        for layer in self.layers:
-            pprint(layer.name, layer.util_funcs)
+        # for layer in self.layers:
+        #     pprint(layer.name)
+        #     pprint(layer.util_funcs)
+        #     print()
+        print("SAVE!")
 
     def load_layers(self):
         for lid, layer in QgsProject.instance().mapLayers().items():
@@ -314,14 +318,22 @@ class Model(QtCore.QAbstractItemModel):
             QgsMessageLog.logMessage(f"{pre_msg} Output layer has no features", tag=TAG, level=Qgis.Warning)
             return
 
+        # check fields
+        if "_min" not in output_layer.fields().names() or "_max" not in output_layer.fields().names():
+            QgsMessageLog.logMessage(f"{pre_msg} Output layer has no _min or _max fields", tag=TAG, level=Qgis.Warning)
+            return
+
         # get min and max values from the output layer
         min_, max_ = float("inf"), float("-inf")
         for feat in output_layer.getFeatures():
-            print(f"{feat['_min']=}, {feat['_max']=}")
             if feat["_min"] < min_:
                 min_ = feat["_min"]
             if feat["_max"] > max_:
                 max_ = feat["_max"]
+
+        if min_ == float("inf") or max_ == float("-inf"):
+            QgsMessageLog.logMessage(f"{pre_msg} min or max not found", tag=TAG, level=Qgis.Warning)
+            return
 
         # set the min and max values to the model layers
         # print(f"View:on_iface_selection_changed_task_finished:321 {pre_msg=}")
@@ -342,31 +354,10 @@ class Model(QtCore.QAbstractItemModel):
                     raster.util_funcs[uf_id]["params"][name]["max"] = max_
                     any_change = True
         if any_change:
-            # create a QModelIndex for the layer
-            # TODO use self.index instead ?
             # print(f"View:on_iface_selection_changed_task_finished:342 {pre_msg=}")
-            # breakit()()
-            index = self.index(self.layers.index(raster), 3)
-            self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
-            # top_left_index = self.index(self.layers.index(raster), 3)
-            # bottom_right_index = self.index(self.layers.index(raster), 4)
-            # self.dataChanged.emit(top_left_index, bottom_right_index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
-            self.layoutChanged.emit()
+            index = self.index(self.layers.index(raster), 4)
+            self.dataChanged.emit(index, index)
             self.save()
-
-            # for lyrs in self.layers:
-            #     if lyrs.name == raster.name:
-            #        print("heyy0")
-            #        for util_func in lyrs.util_funcs:
-            #            print(f"\t{util_func['name']}")
-            #            for name, params in util_func["params"].items():
-            #                print(f"\t\t{name}, {params}")
-            #        for util_func in raster.util_funcs:
-            #            print(f"\t{util_func['name']}")
-            #            for name, params in util_func["params"].items():
-            #                print(f"\t\t{name}, {params}")
-            #        assert lyrs.util_funcs == raster.util_funcs
-            #        print("heyy1")
 
         QgsMessageLog.logMessage(
             f"{pre_msg} finished successfully, new {min_=}, {max_=}, {any_change=}", tag=TAG, level=Qgis.Info
