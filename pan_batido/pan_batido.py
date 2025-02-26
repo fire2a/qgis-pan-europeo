@@ -197,7 +197,7 @@ class Marraqueta:
             self.first_start = False
             self.context = QgsProcessingContext()
             self.context.setProject(QgsProject.instance())
-            self.model = Model()  # PanRasters(self.iface, self.context)
+            self.model = Model(iface=self.iface, context=self.context)
             self.dlg = Dialog(iface=self.iface, model=self.model)
             print("===Dialog created===")
         else:

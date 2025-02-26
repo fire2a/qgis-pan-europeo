@@ -204,7 +204,7 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         if sliders := index.model().data(index, Qt.EditRole):
-            print(f"SliderListDelegate:print: {index.row()}, {index.column()} {sliders=}")
+            # print(f"SliderListDelegate:print: {index.row()}, {index.column()} {sliders=}")
             tree = self.parent().tree
             editor = QtWidgets.QWidget(parent=tree)
             editor.setAttribute(Qt.WA_TranslucentBackground)
