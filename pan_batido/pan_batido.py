@@ -27,23 +27,23 @@
 # InteractiveShellEmbed()()
 # fmt: on
 """
-import importlib
-import multiprocessing
 import os.path
-import sys
 from functools import partial
-from time import sleep
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from qgis.core import (Qgis, QgsApplication, QgsMessageLog, QgsProcessingAlgRunnerTask, QgsProcessingContext,
-                       QgsProcessingFeedback, QgsProject, QgsTask, QgsTaskManager)
+                       QgsProject, QgsRasterLayer, QgsTask)
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
+from .constants import TAG
+from .models.model import Model
 # Initialize Qt resources from file resources.py
 from .resources.resources import *
 # Import the code for the dialog
-from .views.pan_batido_dialog import MarraquetaDialog
+from .views.view import Dialog
 
 
 class Marraqueta:
@@ -77,6 +77,11 @@ class Marraqueta:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        self.tasks = []
+        self.final_task = None
+        self.context = None
+        self.model = None
+        self.dlg = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -169,7 +174,7 @@ class Marraqueta:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ":/plugins/pan_batido/resources/europe_icon.png"
+        icon_path = ":/plugins/pan_batido/resources/icon.png"
         self.add_action(
             icon_path, text=self.tr("Load rasters before launching!"), callback=self.run, parent=self.iface.mainWindow()
         )
@@ -190,10 +195,13 @@ class Marraqueta:
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = MarraquetaDialog()
+            self.context = QgsProcessingContext()
+            self.context.setProject(QgsProject.instance())
+            self.model = Model(iface=self.iface, context=self.context)
+            self.dlg = Dialog(iface=self.iface, model=self.model)
             print("===Dialog created===")
         else:
-            self.dlg.populate_rasters()
+            print("===Dialog already===")
 
         # show the dialog
         self.dlg.show()
@@ -202,9 +210,119 @@ class Marraqueta:
         # See if OK was pressed
         if result:
             print("===OK was pressed===")
-            QgsMessageLog.logMessage("OK was pressed", tag="Marraqueta", level=Qgis.Info)
-            self.dlg.model.print_current_params()
+            QgsMessageLog.logMessage("OK was pressed", tag=TAG, level=Qgis.Info)
+            # self.model.print_current_params()
+            # self.doit(self.model, self.dlg)
 
         else:
             print("===else than OK===")
-            self.dlg.model.print_all_params()
+            # self.dlg.model.print_all_params()
+
+    def doit(self, model, view):
+        """
+        Run the calculations
+        - get a temporary folder
+        - get n+1 temporary files in that folder
+        - use the processing algorithm "paneuropeo:normalizator" to normalize each raster
+        - use the processing algorithm "paneuropeo:sumator" to sum all the normalized rasters with their weights
+        - chain the sumator to run after all the normalizators
+        """
+        QgsMessageLog.logMessage(" ", tag=TAG, level=Qgis.Success)
+        QgsMessageLog.logMessage("Starting calculations", tag=TAG, level=Qgis.Info)
+
+        weights = []
+        outfiles = []
+        self.tasks = []
+        self.final_task = None
+
+        add2map = view.checkBox_load_normalized.isChecked()
+
+        def task_finished(context, successful, results, force_name="Result", add2map=True):
+            if not successful:
+                QgsMessageLog.logMessage(f"Task finished unsuccessfully {results}", tag=TAG, level=Qgis.Warning)
+            else:
+                QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)
+                if add2map:
+                    output_layer = context.getMapLayer(results["OUTPUT"])
+                    if output_layer and output_layer.isValid():
+                        QgsProject.instance().addMapLayer(context.takeResultLayer(output_layer.id()))
+                        print("from context")
+                    elif Path(results["OUTPUT"]).is_file():
+                        layer = QgsRasterLayer(results["OUTPUT"], force_name)
+                        QgsProject.instance().addMapLayer(layer)
+                        print("from file")
+
+        rasters = model.get_rasters()
+        model.balance_weights()
+        for raster_name, raster in rasters.items():
+            if model.get_visibility(raster_name):
+                weight = model.get_weight(raster_name) / 100
+                weights += [weight]
+
+                method = model.get_current_utility_function_name(raster_name)
+                if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
+                    minimum, maximum = model.get_minmax(raster_name)
+                else:
+                    minimum, maximum = None, None
+
+                func_params = model.get_raster_params(raster_name, method)
+                func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
+
+                outfile = NamedTemporaryFile(suffix=".tif", delete=False).name
+                outfiles += [outfile]
+
+                task = QgsProcessingAlgRunnerTask(
+                    algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
+                    parameters={
+                        "EXTENT_OPT": 0,
+                        "INPUT_A": raster,  # .publicSource(),
+                        "MAX": maximum,
+                        "METHOD": method,
+                        "MIN": minimum,
+                        "NO_DATA": None,
+                        "OUTPUT": outfile,
+                        "PARAMS": func_values_str,
+                        "PROJWIN": None,
+                        "RTYPE": 7,
+                    },
+                    context=self.context,
+                )
+                task.setDescription(f"Normalizing {raster_name}")
+                task.executed.connect(
+                    partial(
+                        task_finished,
+                        self.context,
+                        force_name="norm_" + raster_name,
+                        add2map=add2map,
+                    )
+                )
+                self.tasks += [task]
+                # report
+                if func_values_str:
+                    func_values_str = " params: {func_values_str}"
+                QgsMessageLog.logMessage(
+                    f"{raster_name=} {weight=} {method=}" + func_values_str,
+                    tag=TAG,
+                    level=Qgis.Info,
+                )
+
+        self.final_task = QgsProcessingAlgRunnerTask(
+            algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator"),
+            parameters={
+                "EXTENT_OPT": 0,
+                "INPUT": outfiles,
+                "NO_DATA": None,
+                "OUTPUT": "TEMPORARY_OUTPUT",
+                "PROJWIN": None,
+                "RTYPE": 7,
+                "WEIGHTS": " ".join(map(str, weights)),
+            },
+            context=self.context,
+        )
+        self.final_task.executed.connect(partial(task_finished, self.context, force_name="Result", add2map=True))
+
+        # Add the final sum task as a subtask with dependencies on all normalization tasks
+        for task in self.tasks:
+            self.final_task.addSubTask(task, [], QgsTask.SubTaskDependency.ParentDependsOnSubTask)
+
+        QgsApplication.taskManager().addTask(self.final_task)

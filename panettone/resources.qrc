@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/plugins/pan_batido/resources" >
+    <qresource prefix="/plugins/panettone" >
         <file>icon.png</file>
     </qresource>
 </RCC>

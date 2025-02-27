@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>649</width>
+    <width>656</width>
     <height>568</height>
    </rect>
   </property>
@@ -15,45 +15,20 @@
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <item>
-    <widget class="QGroupBox" name="groupBox">
-     <property name="title">
+    <widget class="QLabel" name="label_in">
+     <property name="text">
       <string>Input rasters</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
-      <item>
-       <widget class="QTreeWidget" name="treeWidget">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="columnCount">
-         <number>4</number>
-        </property>
-        <column>
-         <property name="text">
-          <string notr="true">1</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string notr="true">2</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string notr="true">3</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string notr="true">4</string>
-         </property>
-        </column>
-       </widget>
-      </item>
-     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTreeView" name="tree">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
     </widget>
    </item>
    <item>
@@ -69,6 +44,16 @@
         </property>
        </widget>
       </item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="doubleSpinBox_no_data">
+        <property name="minimum">
+         <double>-9999999999999.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>9999999999999.000000000000000</double>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_2">
         <property name="text">
@@ -76,20 +61,38 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QgsDoubleSpinBox" name="mQgsDoubleSpinBox"/>
-      </item>
       <item row="1" column="1">
-       <widget class="QComboBox" name="comboBox"/>
+       <widget class="QComboBox" name="comboBox_rtype">
+        <property name="currentText">
+         <string/>
+        </property>
+        <property name="placeholderText">
+         <string>Not set</string>
+        </property>
+       </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QgsExtentGroupBox" name="mExtentGroupBox"/>
+      <item row="3" column="1">
+       <widget class="QgsExtentGroupBox" name="mExtentGroupBox">
+        <property name="collapsed">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QCheckBox" name="checkBox_load_normalized">
+        <property name="text">
+         <string>Load intermediate normalized rasters</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
    </item>
    <item>
-    <widget class="QDialogButtonBox" name="buttonBox">
+    <widget class="QDialogButtonBox" name="button_box">
      <property name="standardButtons">
       <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Close|QDialogButtonBox::Help|QDialogButtonBox::Ok|QDialogButtonBox::Reset</set>
      </property>
@@ -103,11 +106,6 @@
    <extends>QGroupBox</extends>
    <header>qgscollapsiblegroupbox.h</header>
    <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>QgsDoubleSpinBox</class>
-   <extends>QDoubleSpinBox</extends>
-   <header>qgsdoublespinbox.h</header>
   </customwidget>
   <customwidget>
    <class>QgsExtentGroupBox</class>
