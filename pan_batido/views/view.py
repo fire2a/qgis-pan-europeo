@@ -23,9 +23,12 @@
 """
 import os
 from functools import partial
+from math import nan
 
-from qgis.PyQt import QtWidgets, uic
-from qgis.PyQt.QtCore import QSize, Qt
+from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
+from qgis.gui import QgsDoubleSpinBox  # type: ignore
+from qgis.PyQt import QtWidgets, uic  # type: ignore
+from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
 
 from .double_spin_slider import DoubleSpinSlider
 
@@ -43,7 +46,7 @@ def breakit():
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), "dialog.ui"))
 
 
-class Dialog(QtWidgets.QDialog, FORM_CLASS):
+class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
     def __init__(self, parent=None, iface=None, model=None):
         """Constructor."""
         super().__init__(parent)
@@ -62,10 +65,40 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):
 
         self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(lambda: self.on_apply())
         # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.delete)
-        # self.button_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.add)
+        self.button_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(lambda: self.on_ok())
+
+        # datatype
+        for i, text in enumerate(GDALDataTypeNames):
+            self.comboBox_rtype.addItem(text, i)
+        # self.comboBox_rtype.setCurrentIndex(GDALDataTypeNames.index("Float32"))
+        self.comboBox_rtype.setCurrentIndex(-1)
+
+        # nodata
+        self.doubleSpinBox_no_data.setSpecialValueText("")
+        self.doubleSpinBox_no_data.clear()
 
     def on_apply(self):
         self.model.balance_weights()
+
+    def on_ok(self):
+        self.model.balance_weights()
+        self.model.doit(
+            load_normalized=self.checkBox_load_normalized.isChecked(),
+            no_data=revalue_double_spin_box(self.doubleSpinBox_no_data),
+            rtype=revalue_combo_box(self.comboBox_rtype),
+        )
+
+
+def revalue_combo_box(combo):
+    if combo.currentIndex() == -1:
+        return None
+    return combo.currentIndex()
+
+
+def revalue_double_spin_box(spin):
+    if spin.text() == spin.specialValueText():
+        return None
+    return spin.value()
 
 
 class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
@@ -244,3 +277,25 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
             del editor
         else:
             super().paint(painter, option, index)
+
+
+if __name__ == "__main__":
+    import sys
+    from math import nan
+
+    from qgis.gui import QgsDoubleSpinBox  # type: ignore
+    from qgis.PyQt.QtWidgets import QApplication  # type: ignore
+    from qgis.PyQt.QtWidgets import QDoubleSpinBox  # type: ignore
+
+    app = QApplication(sys.argv)
+    spin = QDoubleSpinBox()
+    spin.setSpecialValueText("Not set")
+    assert spin.specialValueText() == "Not set"
+    spin = QgsDoubleSpinBox()
+    spin.setClearValue(nan, "Not set")
+    spin.clear()
+    nan == spin.clearValue()
+
+    dialog = Dialog()
+    dialog.show()
+    sys.exit(app.exec_())

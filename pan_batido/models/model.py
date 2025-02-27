@@ -14,14 +14,16 @@ InteractiveShellEmbed()()
 import json
 from functools import partial
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from attrs import define, field
 from cattrs import structure, unstructure
-from osgeo.gdal import GA_ReadOnly, Open
+from osgeo.gdal import GA_ReadOnly, Open  # type: ignore
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
-from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsMessageLog, QgsProcessingAlgRunnerTask,
-                       QgsProcessingFeatureSourceDefinition, QgsProject, QgsRasterLayer, QgsVectorLayer)
+from qgis.core import QgsMessageLog  # type: ignore
+from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsProcessingAlgRunnerTask,
+                       QgsProcessingFeatureSourceDefinition, QgsProject, QgsRasterLayer, QgsTask, QgsVectorLayer)
 
 from ..constants import TAG, UTILITY_FUNCTIONS
 
@@ -29,7 +31,7 @@ from ..constants import TAG, UTILITY_FUNCTIONS
 def breakit():
     # fmt: off
     from IPython.terminal.embed import InteractiveShellEmbed
-    from qgis.PyQt.QtCore import pyqtRemoveInputHook
+    from qgis.PyQt.QtCore import pyqtRemoveInputHook  # type: ignore
     pyqtRemoveInputHook()
     # fmt: on
     return InteractiveShellEmbed()
@@ -94,8 +96,8 @@ class Model(QtCore.QAbstractItemModel):
         if not index.isValid():
             return QVariant()
 
-        layer = self.layers[index.row()]
         row, column = index.row(), index.column()
+        layer = self.layers[row]
 
         if role == Qt.CheckStateRole and column == 0:
             return Qt.Checked if layer.visibility else Qt.Unchecked
@@ -107,14 +109,14 @@ class Model(QtCore.QAbstractItemModel):
             return layer.weight
         if role == Qt.EditRole and column == 3:
             combo = {"cb": layer.util_funcs, "idx": layer.uf_idx}
-            print(f"Model:data: ({row}, {column}), {combo=}")
+            # print(f"Model:data: ({row}, {column}), {combo=}")
             return combo
         if role == Qt.EditRole and column == 4:
             sliders = [
                 (text, values["min"], values["value"], values["max"])
                 for text, values in layer.util_funcs[layer.uf_idx]["params"].items()
             ]
-            print(f"Model:data: ({row}, {column}), {sliders=}")
+            # print(f"Model:data: ({row}, {column}), {sliders=}")
             return sliders
 
         return QVariant()
@@ -126,31 +128,31 @@ class Model(QtCore.QAbstractItemModel):
             if QgsProject.instance().layerTreeRoot().findLayer(lid):
                 self.layers[row].visibility = value == Qt.Checked
                 self.dataChanged.emit(index, index)
-                self.save()
+                # self.save()
                 self.visibilityChanged.emit(lid, value == Qt.Checked)
                 return True
         if role == Qt.EditRole and column == 2:
             self.layers[index.row()].weight = value
             self.dataChanged.emit(index, index)
-            self.save()
+            # self.save()
             return True
         if role == Qt.EditRole and column == 3:
-            print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
+            # print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
             layer = self.layers[index.row()]
             layer.util_funcs = value["cb"]
             layer.uf_idx = value["idx"]
             self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
-            self.save()
+            # self.save()
             return True
         if role == Qt.EditRole and column == 4:
-            print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
+            # print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
             # breakit()()
             layer = self.layers[index.row()]
             for slider in value:
                 param_name, _, val, _ = slider
                 layer.util_funcs[layer.uf_idx]["params"][param_name]["value"] = val
             self.dataChanged.emit(index, index)
-            self.save()
+            # self.save()
             return True
         return False
 
@@ -222,7 +224,7 @@ class Model(QtCore.QAbstractItemModel):
         for lid in rem_layers:
             self.layers = [lyr for lyr in self.layers if lyr.id != lid]
         self.layoutChanged.emit()
-        self.save()
+        # self.save()
 
     def on_layers_added(self, add_layers):
         for layer in add_layers:
@@ -239,7 +241,7 @@ class Model(QtCore.QAbstractItemModel):
                 ]
                 QTimer.singleShot(0, lambda lid=layer.id(): self.connect_layer_visibility_signal(lid))
         self.layoutChanged.emit()
-        self.save()
+        # self.save()
 
     def connect_layer_visibility_signal(self, layer_id):
         layer_tree_layer = QgsProject.instance().layerTreeRoot().findLayer(layer_id)
@@ -301,6 +303,7 @@ class Model(QtCore.QAbstractItemModel):
         pre_msg = f'Task "{description}"'
         if not successful:
             QgsMessageLog.logMessage(f"{pre_msg} finished unsuccessfully", tag=TAG, level=Qgis.Warning)
+            QgsMessageLog.logMessage(f"{pre_msg} {results=}", tag=TAG, level=Qgis.Critical)
             return
         output_layer = context.getMapLayer(results["OUTPUT"])
         # print(output_layer.fields().names())
@@ -347,13 +350,13 @@ class Model(QtCore.QAbstractItemModel):
             # TODO use self.index instead ?
             # print(f"View:on_iface_selection_changed_task_finished:342 {pre_msg=}")
             # breakit()()
-            index = self.index(self.layers.index(raster), 3)
+            index = self.index(self.layers.index(raster), 4)
             self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
             # top_left_index = self.index(self.layers.index(raster), 3)
             # bottom_right_index = self.index(self.layers.index(raster), 4)
             # self.dataChanged.emit(top_left_index, bottom_right_index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
             self.layoutChanged.emit()
-            self.save()
+            # self.save()
 
             # for lyrs in self.layers:
             #     if lyrs.name == raster.name:
@@ -380,7 +383,123 @@ class Model(QtCore.QAbstractItemModel):
                 layer.weight /= total
                 self.dataChanged.emit(self.index(i, 2), self.index(i, 2), [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
         self.layoutChanged.emit()
+        # self.save()
+
+    def doit(self, load_normalized=False, no_data=None, rtype=7):
+        """
+        from osgeo_utils.gdal_calc import GDALDataTypeNames
+        rtype 7: Float32 : GDALDataTypeNames[7]
+        """
+        print(f"Model.doit: {load_normalized=}, {no_data=}, {rtype=}")
         self.save()
+        outfiles = []
+        norm_tasks = []
+        for raster in self.layers:
+            if not raster.visibility:
+                continue
+            util_func = raster.util_funcs[raster.uf_idx]
+            # normalization method
+            method = util_func["name"]
+            # don't need minmax
+            if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
+                minimum, maximum = None, None
+            else:
+                params = util_func["params"]
+                if len(params) > 0:
+                    first = list(params.values())[0]
+                    minimum, maximum = first["min"], first["max"]
+                else:
+                    print("no params!?")
+                    minimum, maximum = None, None
+            # params
+            func_params = util_func["params"]
+            func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
+            # output file
+            outfile = NamedTemporaryFile(suffix=".tif", delete=False).name
+            outfiles += [outfile]
+
+            task = QgsProcessingAlgRunnerTask(
+                algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
+                parameters={
+                    "EXTENT_OPT": 0,
+                    "INPUT_A": raster.filepath,
+                    "MAX": maximum,
+                    "METHOD": method,
+                    "MIN": minimum,
+                    "NO_DATA": no_data,
+                    "OUTPUT": outfile,
+                    "PARAMS": func_values_str,
+                    "PROJWIN": None,
+                    "RTYPE": rtype,
+                },
+                context=self.context,
+            )
+            if func_values_str:
+                func_values_str = f" {func_values_str}"
+            raster_short_name = raster.name[:6] + "..." if len(raster.name) > 6 else raster.name
+            description = f"Normalize {raster_short_name} {method} {func_values_str}"
+            task.setDescription(description)
+            task.executed.connect(
+                partial(
+                    self.on_doit_task_finished,
+                    force_name="norm_" + raster.name,
+                    add2map=load_normalized,
+                    description=description,
+                )
+            )
+            norm_tasks += [task]
+            # report
+            QgsMessageLog.logMessage(f'Adding task "{description}". Weight:{raster.weight}%', tag=TAG, level=Qgis.Info)
+
+        final_task = QgsProcessingAlgRunnerTask(
+            algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator"),
+            parameters={
+                "EXTENT_OPT": 0,
+                "INPUT": outfiles,
+                "NO_DATA": None,
+                "OUTPUT": "TEMPORARY_OUTPUT",
+                "PROJWIN": None,
+                "RTYPE": 7,
+                "WEIGHTS": " ".join(map(str, [r.weight / 100 for r in self.layers if r.visibility])),
+            },
+            context=self.context,
+        )
+        description = f"Weighted Sum of {len(outfiles)} normalized rasters"
+        final_task.executed.connect(
+            partial(
+                self.on_doit_task_finished,
+                force_name="WEIGHTED_SUM",
+                add2map=True,
+                description=description,
+            )
+        )
+        for task in norm_tasks:
+            # final_task.addDependentTask(task) same ?
+            final_task.addSubTask(task, [], QgsTask.SubTaskDependency.ParentDependsOnSubTask)
+
+        self.tasks += [final_task] + norm_tasks
+        QgsApplication.taskManager().addTask(final_task)
+        QgsMessageLog.logMessage(f'Starting parent Task "{description}"', tag=TAG, level=Qgis.Info)
+        print(f"Model.doit: {self.tasks=}")
+
+    def on_doit_task_finished(self, successful, results, force_name="Result", add2map=lambda: True, description=""):
+        pre_msg = f'Task "{description}"'
+        if not successful:
+            QgsMessageLog.logMessage(f"{pre_msg} finished unsuccessfully", tag=TAG, level=Qgis.Warning)
+            QgsMessageLog.logMessage(f"{pre_msg} {results=}", tag=TAG, level=Qgis.Critical)
+            return
+        output_layer = self.context.getMapLayer(results["OUTPUT"])
+        # QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)
+        if add2map:
+            if output_layer and output_layer.isValid():
+                QgsProject.instance().addMapLayer(self.context.takeResultLayer(output_layer.id()))
+                QgsMessageLog.logMessage(f"{pre_msg} added raster from context layer.", tag=TAG, level=Qgis.Success)
+                print("from context")
+            elif Path(results["OUTPUT"]).is_file():
+                layer = QgsRasterLayer(results["OUTPUT"], force_name)
+                QgsProject.instance().addMapLayer(layer)
+                QgsMessageLog.logMessage(f"{pre_msg} added raster from file.", tag=TAG, level=Qgis.Success)
+                print("from file")
 
 
 def get_file_minmax(filename, force=True):
