@@ -3,7 +3,8 @@ name: Create Release for Dialog
 on:
   push:
     tags:
-      - 'dialog-v[0-9]+.[0-9]+.[0-9]+'
+      - 'dialog-v[0-9]+.[0-9]+.[0-9]+\w?'
+      - 'v[0-9]+.[0-9]+.[0-9]+\w?'
   workflow_dispatch:
   pull_request:
 
@@ -41,10 +42,7 @@ jobs:
     - name: Version bump
       run: |
         VERSION=${{ env.VERSION }}
-        echo "version is ${VERSION}"
-        echo $(grep version pan_batido/metadata.txt)
         sed -i -e "s/version=0.0.1/version=${VERSION}/" pan_batido/metadata.txt
-        echo $(grep version pan_batido/metadata.txt)
 
     - name: Archive fire2a-lib
       run: |
