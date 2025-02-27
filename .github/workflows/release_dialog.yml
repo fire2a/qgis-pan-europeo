@@ -1,0 +1,55 @@
+name: Create Release for Dialog
+
+on:
+  push:
+    tags:
+      - 'dialog-v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  archive-n-publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Resolve symbolic links
+      run: |
+        chmod +x resolve_symlinks.sh
+        ./resolve_symlinks.sh
+
+    - name: Set version
+      run:
+        echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+        TAG_NAME=$(git describe --tags)
+        echo "TAG_DESCRIPTION=$(git tag -n99 $TAG_NAME | sed -n '2p')" >> $GITHUB_ENV
+        VERSION=$(echo $TAG_NAME | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+    - name: Version bump
+      run: |
+        echo $(grep metadata pan_batido/metadata.txt)
+        sed -i -e "s/version=0.0.1/version=${{ env.VERSION }}/" pan_batido/metadata.txt
+        echo $(grep metadata pan_batido/metadata.txt)
+        git add pan_batido/metadata.txt
+
+    - name: Archive fire2a-lib
+      run: |
+        stash=`git stash create`
+        git archive --output "pan_batido_$VERSION.zip" $stash pan_batido
+
+    - name: Create Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: "pan_batido_${{ env.VERSION }}.zip"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: true
+        tag: ${{ env.RELEASE_TAG }}
+        name: ${{ env.RELEASE_TAG }}
+        body: ${{ env.TAG_DESCRIPTION }}
