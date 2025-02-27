@@ -60,4 +60,3 @@ jobs:
         name: ${{ env.RELEASE_TAG }}
         body: ${{ env.TAG_DESCRIPTION }}
         allowUpdates: true
-        updateOnlyUnreleased: true
