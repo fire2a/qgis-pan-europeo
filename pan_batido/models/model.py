@@ -385,7 +385,7 @@ class Model(QtCore.QAbstractItemModel):
         self.layoutChanged.emit()
         # self.save()
 
-    def doit(self, load_normalized=False, no_data=None, rtype=7):
+    def doit(self, load_normalized=False, no_data=None, rtype=7, projwin=None):
         """
         from osgeo_utils.gdal_calc import GDALDataTypeNames
         rtype 7: Float32 : GDALDataTypeNames[7]
@@ -429,7 +429,7 @@ class Model(QtCore.QAbstractItemModel):
                     "NO_DATA": no_data,
                     "OUTPUT": outfile,
                     "PARAMS": func_values_str,
-                    "PROJWIN": None,
+                    "PROJWIN": projwin,
                     "RTYPE": rtype,
                 },
                 context=self.context,
@@ -486,7 +486,9 @@ class Model(QtCore.QAbstractItemModel):
         pre_msg = f'Task "{description}"'
         if not successful:
             QgsMessageLog.logMessage(f"{pre_msg} finished unsuccessfully", tag=TAG, level=Qgis.Warning)
-            QgsMessageLog.logMessage(f"{pre_msg} {results=}", tag=TAG, level=Qgis.Critical)
+            QgsMessageLog.logMessage(
+                f"{pre_msg} {results=}, check the Processing tab logs for more info!", tag=TAG, level=Qgis.Critical
+            )
             return
         output_layer = self.context.getMapLayer(results["OUTPUT"])
         # QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)

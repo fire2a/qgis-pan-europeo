@@ -26,6 +26,7 @@ from functools import partial
 from math import nan
 
 from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
+from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
 from qgis.gui import QgsDoubleSpinBox  # type: ignore
 from qgis.PyQt import QtWidgets, uic  # type: ignore
 from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
@@ -62,20 +63,22 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.tree.setItemDelegateForColumn(2, WeightDoubleSpinSliderDelegate(self))
         self.tree.setItemDelegateForColumn(3, UtilityFuncComboBoxDelegate(self))
         self.tree.setItemDelegateForColumn(4, SliderListDelegate(self))
-
+        # buttons
         self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(lambda: self.on_apply())
         # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.delete)
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(lambda: self.on_ok())
-
         # datatype
         for i, text in enumerate(GDALDataTypeNames):
             self.comboBox_rtype.addItem(text, i)
         # self.comboBox_rtype.setCurrentIndex(GDALDataTypeNames.index("Float32"))
         self.comboBox_rtype.setCurrentIndex(-1)
-
         # nodata
         self.doubleSpinBox_no_data.setSpecialValueText("")
         self.doubleSpinBox_no_data.clear()
+        # extent
+        self.setup_extent_group_box()
+        self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)
+        self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed_update_extent_group_box)
 
     def on_apply(self):
         self.model.balance_weights()
@@ -86,7 +89,43 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
             load_normalized=self.checkBox_load_normalized.isChecked(),
             no_data=revalue_double_spin_box(self.doubleSpinBox_no_data),
             rtype=revalue_combo_box(self.comboBox_rtype),
+            projwin=self.mExtentGroupBox.outputExtent(),
         )
+
+    def setup_extent_group_box(self):
+        """Set up the QgsExtentGroupBox."""
+        extent = self.iface.mapCanvas().extent()
+        crs = QgsProject.instance().crs()
+
+        self.mExtentGroupBox.setOriginalExtent(extent, crs)
+        self.mExtentGroupBox.setCurrentExtent(extent, crs)
+        self.mExtentGroupBox.setOutputCrs(crs)
+
+    def handle_extent_change(self):
+        """Handle the extentsChanged signal from the map canvas."""
+        extent = self.iface.mapCanvas().extent()
+        crs = QgsProject.instance().crs()
+        self.mExtentGroupBox.setCurrentExtent(extent, crs)
+
+    def on_iface_selection_changed_update_extent_group_box(self, layer):
+        if isinstance(layer, QgsVectorLayer) and layer.selectedFeatureCount() > 0:
+            if layer.selectedFeatureCount() == 1:
+                extent = layer.selectedFeatures()[0].geometry().boundingBox()
+            else:
+                min_x = float("inf")
+                max_x = -float("inf")
+                min_y = float("inf")
+                max_y = -float("inf")
+                for feat in layer.selectedFeatures():
+                    bbox = feat.geometry().boundingBox()
+                    min_x = min(bbox.xMinimum(), min_x)
+                    max_x = max(bbox.xMaximum(), max_x)
+                    min_y = min(bbox.yMinimum(), min_y)
+                    max_y = max(bbox.yMaximum(), max_y)
+                extent = QgsRectangle(min_x, min_y, max_x, max_y)
+
+            crs = QgsProject.instance().crs()
+            self.mExtentGroupBox.setOutputExtentFromUser(extent, crs)
 
 
 def revalue_combo_box(combo):
