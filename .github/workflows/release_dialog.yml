@@ -25,7 +25,7 @@ jobs:
         ./resolve_symlinks.sh
 
     - name: Set version and tag
-      run:
+      run: |
         if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           echo "RELEASE_TAG=${{ github.sha }}" >> $GITHUB_ENV
           echo "TAG_DESCRIPTION=${{ github.sha }}" >> $GITHUB_ENV
