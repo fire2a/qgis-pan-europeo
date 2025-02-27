@@ -31,16 +31,15 @@ jobs:
       run: |
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           echo "RELEASE_TAG=${{ github.event_name }}-${{ github.event.pull_request.number}}" >> $GITHUB_ENV
-          VERSION="0.0.0"
+          echo "VERSION='0.0.0'" >> $GITHUB_ENV
         fi
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           echo "RELEASE_TAG=${{ github.event_name }}" >> $GITHUB_ENV
-          VERSION="0.0.0"
+          echo "VERSION='0.0.0'" >> $GITHUB_ENV
         fi
         if [[ "${{ github.event_name }}" == "push" ]]; then
-          VERSION={{ github.ref }} >> $GITHUB_ENV
-          clean_ref_prefix=$(echo ${{ github.ref }} | sed -e 's/^\w\+//')
-          echo "RELEASE_TAG=${{ clean_ref_prefix }}" >> $GITHUB_ENV
+          echo "VERSION=${{ github.ref }}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$(echo $VERSION | sed -e 's/^\w\+-//')" >> $GITHUB_ENV
         fi
         echo $RELEASE_TAG
         echo $VERSION
