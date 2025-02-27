@@ -29,16 +29,26 @@ jobs:
 
     - name: Set version and tag
       run: |
-        if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          echo "RELEASE_TAG=PullRequest" >> $GITHUB_ENV
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          echo "RELEASE_TAG=${{ github.event_name }}" >> $GITHUB_ENV
           echo "TAG_DESCRIPTION=PullRequest${{ github.event.pull_request.number}}" >> $GITHUB_ENV
           VERSION="0.0.0"
-        else
+        fi
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "RELEASE_TAG=${{ github.event_name }}" >> $GITHUB_ENV
+          echo "TAG_DESCRIPTION=Manual${{ github.event.pull_request.number}}" >> $GITHUB_ENV
+          VERSION="0.0.0"
+        fi
+        if [[ "${{ github.event_name }}" == "push" ]]; then
           echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
           TAG_NAME=$(git describe --tags)
+          echo $TAG_NAME
           echo "TAG_DESCRIPTION=$(git tag -n99 $TAG_NAME | sed -n 's/^[^ ]*\s\+//p')" >> $GITHUB_ENV
           VERSION=$(echo $RELEASE_TAG | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
         fi
+        echo $RELEASE_TAG
+        echo $TAG_DESCRIPTION
+        echo $VERSION
         echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
     - name: Version bump
