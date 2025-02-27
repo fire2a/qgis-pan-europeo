@@ -1,56 +1,45 @@
+# Easy Raster Summarization tool for QGIS
+
+## Usage
+
+1. Prepare rasters: Match all raster CRS and extents (squared or projected please)
+2. Put them on a QGIS project (same CRS)
+3. Launch the plugin dialog
+4. For each raster:
+    1. Select the relative weight for the final summation
+    2. Select the utility function (some require moving sliders for configuration)
+5. Set the work area, by selecting polygon(s) or use the extent selector
+6. Ok (a cancellable task will run in the background)
+
+## Installation
+Install the plugin from the QGIS plugin repository
+
 - Dialog plugin : ![Pan Batido](https://plugins.qgis.org/plugins/pan_batido/)
-- GdalAlgorithmProcessing plugin : ![Panettone](panettone/README.md)
 
-# Pan European Raster Algorithms (PERA) project
+- TODO: publish the GdalAlgorithmProcessing plugin acting as backend: ![Panettone](panettone/README.md)
 
-This repository contains the code for the Pan European Raster Algo (PERA) project. The PERA project is a collaboration between PEACH (Protection of Environment and Cultural Heritage) and the FIG(Fire Investigacion and Goverance). The project aims to develop a set of algorithms to process raster data in a distributed computing environment. The algorithms are designed to work with large-scale raster datasets, such as those produced by Technosylva and ERICO.
-
-## How to?
-
-Put `pan_batido` directory in you qgis plugin folder
-
-## Current status
-### Features:
-#### 1. Reads all layers available and draws a dialog with:
-
-A. Each row belonging to a layer, containing
-- layer name 
-- weight attributes (checkbox for dis/en-abling, spinbox & slider in 0,100 range) 
-- utility function configuration x2:
--- Min-Max scaling, with a invert checkbox
--- Bi-Piecewise-Linear, with spinboxes&sliders for its two 2 points (where the range are the raster min-max values)
-  
-B. A Toolbox with standard buttons (Ok, Cancel, Reset)
-
-#### 2. The user can:
-- Press Cancel nothing is done
-- Press Reset to destory current read layers and configuration options
-- Press Ok a new layer is calculated:
-
-#### 3. The new layer is calculated as follows:
-- The current mapCanvas is selected as extent for the new layer
-- Raster data is gathered up to default (1920x1080 pixels of 100m side) resolution, else is nearest neighbor down-sampled
-- The selected weight attributes are multiplied by the utility function
-
-### TODO Roadmap:
-1. Target resolution selector (3 spinboxes with the target resolution of the new raster width, height, pixel size)
-2. Resampling method combobox selector for each layer
-3. DataType target selector float32, uint16 o uint 8
-4. Add and use raster overviews `gdaladdo`
-
-### Development notes:
-* dialog_base.ui is dummy
-* pan_frances.py is not used right now but will allocate all methods from pan_batido.py except the plugin class itself
-* an installation of fire2-lib will be required, eventually moving common methods outside of pan_batido.py
+### Development
+Clone, symlink, restart QGIS and enable the plugin
 ```
-pip install git+https://github.com/fire2a/fire2a-lib.git
-or 
-git clone git@github.com:fire2a/fire2a-lib.git
-cd fire2a-lib
-pip install -e .
+git clone
+cd ~/.local/share/QGIS/QGIS3/profiles/default/python/plugins
+ln -s /path/to/this/repo/pan_batido .
+ln -s /path/to/this/repo/panettone .
 ```
 
-# Dev Notes References
+#### TODO:
+- [ ] bug on view update, recalculating min max based on the selected feature
+- [ ] Ouput with zonal statistics
+- [ ] packaging
+- [ ] Data server ...
+
+#### Changelog
+1. Target resolution: scrapped!
+2. Resampling method: scrapped!
+3. DataType target selector: ok!
+4. backend changed to gdalcal 
+
+#### References
 
     nodata = band.GetNoDataValue()
     rasterArray = np.ma.masked_equal(rasterArray, nodata)
