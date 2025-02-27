@@ -38,8 +38,10 @@ jobs:
           echo "VERSION='0.0.0'" >> $GITHUB_ENV
         fi
         if [[ "${{ github.event_name }}" == "push" ]]; then
-          echo "VERSION=${{ github.ref }}" >> $GITHUB_ENV
-          echo "RELEASE_TAG=$(echo $VERSION | sed -e 's/^\w\+-//')" >> $GITHUB_ENV
+          REF="${{ github.ref##refs/tags/ }}"
+          echo "VERSION=${REF}" >> $GITHUB_ENV
+          CLEAN_TAG=$(echo ${REF} | sed -e 's/^\w\+-//')
+          echo "RELEASE_TAG=${CLEAN_TAG}" >> $GITHUB_ENV
         fi
         echo $RELEASE_TAG
         echo $VERSION
