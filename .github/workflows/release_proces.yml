@@ -1,13 +1,14 @@
-name: Create Release
+name: Create Release for Dialog
 
-  # on:
-  #   push:
-  #     tags:
-  #       - 'dialog-v[0-9]+.[0-9]+.[0-9]+'
-  #       - 'proces-v[0-9]+.[0-9]+.[0-9]+'
+on:
+  push:
+    tags:
+      - 'proces-v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+  pull_request:
 
 jobs:
-  build-n-publish:
+  archive-n-publish:
     runs-on: ubuntu-latest
 
     permissions:
@@ -23,94 +24,35 @@ jobs:
         chmod +x resolve_symlinks.sh
         ./resolve_symlinks.sh
 
-    - name: Set Release Tag
-      id: set_tag
+    - name: Set version and tag
       run: |
-        echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
-        TAG_NAME=$(git describe --tags)
-        echo "TAG_DESCRIPTION=$(git tag -n99 $TAG_NAME | sed -n '2p')" >> $GITHUB_ENV
-        VERSION=$(echo $TAG_NAME | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+        if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "RELEASE_TAG=PullRequest" >> $GITHUB_ENV
+          echo "TAG_DESCRIPTION=PullRequest${{ github.event.pull_request.number}}" >> $GITHUB_ENV
+          VERSION="0.0.0"
+        else
+          echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          TAG_NAME=$(git describe --tags)
+          echo "TAG_DESCRIPTION=$(git tag -n99 $TAG_NAME | sed -n '2p')" >> $GITHUB_ENV
+          VERSION=$(echo $RELEASE_TAG | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+        fi
         echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-    - name: Version bump for Plugin 1
-      if: contains(github.ref, 'dialog')
+    - name: Version bump
       run: |
-         VERSION=${{ env.VERSION }}
-         echo "version is ${VERSION}"
-         sed -i -e "s/version=0.0.1/version=${VERSION}/" pan_batido/metadata.txt
-         git add pan_batido/metadata.txt
+        VERSION=${{ env.VERSION }}
+        echo "version is ${VERSION}"
+        echo $(grep version panettone/metadata.txt)
+        sed -i -e "s/version=0.0.1/version=${VERSION}/" panettone/metadata.txt
+        echo $(grep version panettone/metadata.txt)
 
-    - name: Version bump for Plugin 2
-      if: contains(github.ref, 'proces')
+    - name: Archive fire2a-lib
       run: |
-         VERSION=${{ env.VERSION }}
-         echo "version is ${VERSION}"
-         sed -i -e "s/version=0.0.1/version=${VERSION}/" another_plugin/metadata.txt
-         git add another_plugin/metadata.txt
+        git add panettone/metadata.txt
+        stash=`git stash create`
+        git archive --output "panettone_$VERSION.zip" $stash panettone
 
-    - name: Checkout fire2a-lib
-      uses: actions/checkout@v2
-      with:
-        repository: "fire2a/fire2a-lib" 
-        path: "fire2a"
-        sparse-checkout: |
-          src/fire2a/raster/*
-          src/fire2a/utils.py
-        sparse-checkout-cone-mode: false
-
-    - name: git archive for Plugin 1
-      if: contains(github.ref, 'dialog')
-      run: |
-         echo "Changing fire2a from installed to relative import"
-         mkdir -p pan_batido/fire2a
-         cp -r fire2a/src/fire2a/raster pan_batido/fire2a/.
-         cp fire2a/src/fire2a/utils.py pan_batido/fire2a/.
-         grep -Rl --include=*py "from fire2a" | tee will.change | xargs -I {} sed -i "s/^from fire2a/from .fire2a/" {}
-         echo "Changed files"
-         cat will.change 
-         rm will.change
-
-         git add pan_batido/fire2a
-         git commit -m "Prepare for release"
-
-         git archive --output "pan_batido_${{ env.VERSION }}.zip" HEAD pan_batido
-
-         # Stash changes to ensure a clean state for the next plugin
-         git stash
-
-    - name: git archive for Plugin 2
-      if: contains(github.ref, 'proces')
-      run: |
-         # Restore stashed changes
-         git stash pop || true
-
-         echo "Changing fire2a from installed to relative import"
-         mkdir -p panettone/fire2a
-         cp -r fire2a/src/fire2a/raster panettone/fire2a/.
-         cp fire2a/src/fire2a/utils.py panettone/fire2a/.
-         grep -Rl --include=*py "from fire2a" | tee will.change | xargs -I {} sed -i "s/^from fire2a/from .fire2a/" {}
-         echo "Changed files"
-         cat will.change 
-         rm will.change
-
-         git add panettone/fire2a
-         git commit -m "Prepare for release"
-
-         git archive --output "panettone_${{ env.VERSION }}.zip" HEAD panettone
-
-    - name: Create Release for Plugin 1
-      if: contains(github.ref, 'dialog')
-      uses: ncipollo/release-action@v1.12.0
-      with:
-        artifacts: "pan_batido_${{ env.VERSION }}.zip"
-        token: ${{ secrets.GITHUB_TOKEN }}
-        draft: true
-        tag: ${{ env.RELEASE_TAG }}
-        name: ${{ env.RELEASE_TAG }}
-        body: ${{ env.TAG_DESCRIPTION }}
-
-    - name: Create Release for Plugin 2
-      if: contains(github.ref, 'proces')
+    - name: Create Release
       uses: ncipollo/release-action@v1.12.0
       with:
         artifacts: "panettone_${{ env.VERSION }}.zip"
@@ -119,3 +61,5 @@ jobs:
         tag: ${{ env.RELEASE_TAG }}
         name: ${{ env.RELEASE_TAG }}
         body: ${{ env.TAG_DESCRIPTION }}
+        allowUpdates: true
+        updateOnlyUnreleased: true
