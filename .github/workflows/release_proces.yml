@@ -11,7 +11,7 @@ on:
   pull_request:
 
 jobs:
-  archive-n-publish:
+  process-archive-n-publish:
     runs-on: ubuntu-latest
 
     permissions:
@@ -38,7 +38,7 @@ jobs:
           echo "VERSION='0.0.0'" >> $GITHUB_ENV
         fi
         if [[ "${{ github.event_name }}" == "push" ]]; then
-          echo "VERSION=${ github.ref_name }" >> $GITHUB_ENV
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
           CLEAN_TAG=$(echo ${REF} | sed -e 's/^\w\+-//')
           echo "RELEASE_TAG=${CLEAN_TAG}" >> $GITHUB_ENV
         fi
