@@ -1,0 +1,67 @@
+name: Create Release for Process
+
+on:
+  push:
+    tags:
+      - 'proces-v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'proces-v[0-9]+.[0-9]+.[0-9]+-\w+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-\w+'
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  process-archive-n-publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Resolve symbolic links
+      run: |
+        chmod +x resolve_symlinks.sh
+        ./resolve_symlinks.sh
+
+    - name: Set version and tag
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          echo "RELEASE_TAG=${{ github.event_name }}-${{ github.event.pull_request.number}}" >> $GITHUB_ENV
+          echo "VERSION='0.0.${{ github.event.pull_request.number}}pr'" >> $GITHUB_ENV
+        fi
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "RELEASE_TAG=${{ github.event_name }}" >> $GITHUB_ENV
+          echo "VERSION='0.0.0man'" >> $GITHUB_ENV
+        fi
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+          CLEAN_TAG=$(echo ${REF} | sed -e 's/^\w\+-//')
+          echo "RELEASE_TAG=${CLEAN_TAG}" >> $GITHUB_ENV
+        fi
+        echo $RELEASE_TAG
+        echo $VERSION
+
+    - name: Version bump
+      run: |
+        VERSION=${{ env.VERSION }}
+        sed -i -e "s/version=0.0.1/version=${VERSION}/" panettone/metadata.txt
+
+    - name: Archive fire2a-lib
+      run: |
+        git add panettone/metadata.txt
+        stash=`git stash create`
+        git archive --output "panettone_$VERSION.zip" $stash panettone
+        sleep 5
+
+    - name: Create Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: "panettone_${{ env.VERSION }}.zip"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: true
+        tag: ${{ env.RELEASE_TAG }}
+        allowUpdates: true
