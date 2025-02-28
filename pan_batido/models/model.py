@@ -397,9 +397,11 @@ class Model(QtCore.QAbstractItemModel):
         for raster in self.layers:
             if not raster.visibility:
                 continue
+            print(f"{raster.name=}")
             util_func = raster.util_funcs[raster.uf_idx]
             # normalization method
             method = util_func["name"]
+            print(f"{method=}")
             # don't need minmax
             if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
                 minimum, maximum = None, None
@@ -414,6 +416,7 @@ class Model(QtCore.QAbstractItemModel):
             # params
             func_params = util_func["params"]
             func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
+            print(f"{func_values_str=}")
             # output file
             outfile = NamedTemporaryFile(suffix=".tif", delete=False).name
             outfiles += [outfile]
