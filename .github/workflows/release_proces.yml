@@ -31,11 +31,11 @@ jobs:
       run: |
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           echo "RELEASE_TAG=${{ github.event_name }}-${{ github.event.pull_request.number}}" >> $GITHUB_ENV
-          echo "VERSION='0.0.0'" >> $GITHUB_ENV
+          echo "VERSION='0.0.${{ github.event.pull_request.number}}pr'" >> $GITHUB_ENV
         fi
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           echo "RELEASE_TAG=${{ github.event_name }}" >> $GITHUB_ENV
-          echo "VERSION='0.0.0'" >> $GITHUB_ENV
+          echo "VERSION='0.0.0man'" >> $GITHUB_ENV
         fi
         if [[ "${{ github.event_name }}" == "push" ]]; then
           echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
@@ -55,6 +55,7 @@ jobs:
         git add panettone/metadata.txt
         stash=`git stash create`
         git archive --output "panettone_$VERSION.zip" $stash panettone
+        sleep 5
 
     - name: Create Release
       uses: ncipollo/release-action@v1.12.0
