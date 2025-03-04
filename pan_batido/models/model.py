@@ -385,14 +385,14 @@ class Model(QtCore.QAbstractItemModel):
         self.layoutChanged.emit()
         # self.save()
 
-    def doit(self, load_normalized=False, no_data=None, rtype=7, projwin=None):
+    def doit(self, load_normalized=False, no_data=None, rtype=7, projwin=None, outfile=""):
         """
         from osgeo_utils.gdal_calc import GDALDataTypeNames
         rtype 7: Float32 : GDALDataTypeNames[7]
         """
         print(f"Model.doit: {load_normalized=}, {no_data=}, {rtype=}")
         self.save()
-        outfiles = []
+        norm_files = []
         norm_tasks = []
         for raster in self.layers:
             if not raster.visibility:
@@ -418,8 +418,8 @@ class Model(QtCore.QAbstractItemModel):
             func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
             print(f"{func_values_str=}")
             # output file
-            outfile = NamedTemporaryFile(suffix=".tif", delete=False).name
-            outfiles += [outfile]
+            norm_file = NamedTemporaryFile(suffix=".tif", delete=False).name
+            norm_files += [norm_file]
 
             task = QgsProcessingAlgRunnerTask(
                 algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
@@ -430,7 +430,7 @@ class Model(QtCore.QAbstractItemModel):
                     "METHOD": method,
                     "MIN": minimum,
                     "NO_DATA": no_data,
-                    "OUTPUT": outfile,
+                    "OUTPUT": norm_file,
                     "PARAMS": func_values_str,
                     "PROJWIN": projwin,
                     "RTYPE": rtype,
@@ -458,20 +458,20 @@ class Model(QtCore.QAbstractItemModel):
             algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator"),
             parameters={
                 "EXTENT_OPT": 0,
-                "INPUT": outfiles,
+                "INPUT": norm_files,
                 "NO_DATA": None,
-                "OUTPUT": "TEMPORARY_OUTPUT",
+                "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
                 "PROJWIN": None,
                 "RTYPE": 7,
                 "WEIGHTS": " ".join(map(str, [r.weight / 100 for r in self.layers if r.visibility])),
             },
             context=self.context,
         )
-        description = f"Weighted Sum of {len(outfiles)} normalized rasters"
+        description = f"Weighted Sum of {len(norm_files)} normalized rasters"
         final_task.executed.connect(
             partial(
                 self.on_doit_task_finished,
-                force_name="WEIGHTED_SUM",
+                force_name="WEIGHTED_SUM" if outfile == "" else Path(outfile).stem,
                 add2map=True,
                 description=description,
             )
