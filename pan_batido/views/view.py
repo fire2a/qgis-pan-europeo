@@ -90,6 +90,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
             no_data=revalue_double_spin_box(self.doubleSpinBox_no_data),
             rtype=revalue_combo_box(self.comboBox_rtype),
             projwin=self.mExtentGroupBox.outputExtent(),
+            outfile=self.fileWidget.filePath(),
         )
 
     def setup_extent_group_box(self):
