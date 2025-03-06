@@ -264,7 +264,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
                 )
             arguments.append("--weights " + " ".join(weights))
 
-        return ["gdal_calc_sum"] + arguments + ["--"] + infiles
+        return [str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"
@@ -272,9 +272,8 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
     def shortHelpString(self):
         import html
 
-        from fire2a.raster import gdal_calc_sum as amodule
+        from .gdal_calc_sum import __doc__ as docstring
 
-        docstring = amodule.__doc__
         docstring = sub(r"<!-- BEGIN_ARGPARSE_DOCSTRING -->", "", docstring)
         docstring = sub(r"<!-- END_ARGPARSE_DOCSTRING -->", "", docstring)
         html_docstring = html.escape(docstring).replace("\n", "<br>")

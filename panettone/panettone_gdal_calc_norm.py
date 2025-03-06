@@ -29,8 +29,9 @@ __copyright__ = "(C) 2025 by fdobad"
 # This will get replaced with a git SHA1 when you do a git archive
 
 __revision__ = "$Format:%H$"
-from re import sub
 from pathlib import Path
+from re import sub
+
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
 from processing.algs.gdal.GdalUtils import GdalUtils
@@ -196,7 +197,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return str(Path(__file__).parent/"gdal_calc_norm.py")
+        return str(Path(__file__).parent / "gdal_calc_norm.py")
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 
@@ -287,7 +288,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
             arguments.append("--")
             arguments.append(self.parameterAsString(parameters, self.PARAMS, context))
 
-        return ["gdal_calc_norm"] + arguments
+        return [str(Path(__file__).parent / "gdal_calc_norm.py")] + arguments
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"
@@ -295,9 +296,8 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
     def shortHelpString(self):
         import html
 
-        from fire2a.raster import gdal_calc_norm as amodule
+        from .gdal_calc_norm import __doc__ as docstring
 
-        docstring = amodule.__doc__
         docstring = sub(r"<!-- BEGIN_ARGPARSE_DOCSTRING -->", "", docstring)
         docstring = sub(r"<!-- END_ARGPARSE_DOCSTRING -->", "", docstring)
         html_docstring = html.escape(docstring).replace("\n", "<br>")
