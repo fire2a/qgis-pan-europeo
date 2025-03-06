@@ -197,7 +197,8 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return "python " + str(Path(__file__).parent / "gdal_calc_norm.py")
+        # return "python " + str(Path(__file__).parent / "gdal_calc_norm.py")
+        return "gdal_calc_norm"
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 

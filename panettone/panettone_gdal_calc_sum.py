@@ -161,7 +161,8 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return "python " + str(Path(__file__).parent / "gdal_calc_sum.py")
+        # return "python " + str(Path(__file__).parent / "gdal_calc_sum.py")
+        return "gdal_calc_sum.py"
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 
