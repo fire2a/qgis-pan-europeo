@@ -31,9 +31,11 @@ __copyright__ = "(C) 2025 by fdobad"
 __revision__ = "$Format:%H$"
 
 from qgis.core import QgsProcessingProvider
+from qgis.PyQt.QtGui import QIcon
 
 from .panettone_gdal_calc_norm import ProcessingGdalCalcNormAlgorithm
 from .panettone_gdal_calc_sum import ProcessingGdalCalcSumAlgorithm
+from .resources import *
 
 
 class PanettonePanetteria(QgsProcessingProvider):
@@ -80,7 +82,7 @@ class PanettonePanetteria(QgsProcessingProvider):
         Should return a QIcon which is used for your provider inside
         the Processing toolbox.
         """
-        return QgsProcessingProvider.icon(self)
+        return QIcon(":/plugins/panettone/icon.png")
 
     def longName(self):
         """
