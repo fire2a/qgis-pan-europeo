@@ -30,7 +30,7 @@ __copyright__ = "(C) 2025 by fdobad"
 
 __revision__ = "$Format:%H$"
 from re import sub
-
+from pathlib import Path
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
 from processing.algs.gdal.GdalUtils import GdalUtils
@@ -196,7 +196,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return "gdal_calc_norm"
+        return str(Path(__file__).parent/"gdal_calc_norm.py")
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 

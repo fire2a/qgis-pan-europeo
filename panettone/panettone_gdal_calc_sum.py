@@ -36,10 +36,9 @@ from re import sub
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
 from processing.algs.gdal.GdalUtils import GdalUtils
-from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParameterDefinition,
-                       QgsProcessingParameterEnum, QgsProcessingParameterExtent, QgsProcessingParameterMultipleLayers,
-                       QgsProcessingParameterNumber, QgsProcessingParameterRasterDestination,
-                       QgsProcessingParameterRasterLayer, QgsProcessingParameterString)
+from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParameterEnum, QgsProcessingParameterExtent,
+                       QgsProcessingParameterMultipleLayers, QgsProcessingParameterNumber,
+                       QgsProcessingParameterRasterDestination, QgsProcessingParameterString)
 from qgis.PyQt.QtCore import QCoreApplication
 
 
@@ -162,7 +161,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return "gdal_calc_norm"
+        return str(Path(__file__).parent / "gdal_calc_sum.py")
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 
