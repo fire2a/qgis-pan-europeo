@@ -161,7 +161,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return str(Path(__file__).parent / "gdal_calc_sum.py")
+        return "python " + str(Path(__file__).parent / "gdal_calc_sum.py")
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 
@@ -264,7 +264,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
                 )
             arguments.append("--weights " + " ".join(weights))
 
-        return [str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
+        return ["python", str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"

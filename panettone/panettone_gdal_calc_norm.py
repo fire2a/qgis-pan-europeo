@@ -197,7 +197,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return str(Path(__file__).parent / "gdal_calc_norm.py")
+        return "python " + str(Path(__file__).parent / "gdal_calc_norm.py")
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 
@@ -288,7 +288,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
             arguments.append("--")
             arguments.append(self.parameterAsString(parameters, self.PARAMS, context))
 
-        return [str(Path(__file__).parent / "gdal_calc_norm.py")] + arguments
+        return ["python", str(Path(__file__).parent / "gdal_calc_norm.py")] + arguments
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"
