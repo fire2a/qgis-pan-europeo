@@ -12,6 +12,7 @@ InteractiveShellEmbed()()
 # layer.dataProvider().bandStatistics(1).maximumValue,
 """
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
@@ -63,7 +64,7 @@ class Layer:
     weight: float = 1.0
     min: float | None = None
     max: float | None = None
-    util_funcs: list[dict] = field(default_factory=lambda: UTILITY_FUNCTIONS.copy())
+    util_funcs: list[dict] = field(default_factory=lambda: deepcopy(UTILITY_FUNCTIONS))
     uf_idx: int = 0  # CURRENTLY SELECTED utility function index
 
 
