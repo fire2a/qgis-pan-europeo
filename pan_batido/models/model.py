@@ -83,6 +83,21 @@ class Model(QtCore.QAbstractItemModel):
         self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed)
         self.tasks = []  # : QgsProcessingAlgRunnerTask
 
+    def reset(self):
+        self.cancel_tasks()
+        self.layers = []
+        self.load_layers()
+
+    def cancel_tasks(self):
+        for task in self.tasks:
+            try:
+                if task.isActive():
+                    task.cancel()
+                    QgsMessageLog.logMessage(f"Task '{task.description()}' canceled", tag=TAG, level=Qgis.Warning)
+            except RuntimeError as e:
+                if str(e).endswith("has been deleted"):
+                    continue
+
     def index(self, row, column, parent=QtCore.QModelIndex()):
         if not self.hasIndex(row, column, parent):
             return QtCore.QModelIndex()
@@ -221,6 +236,9 @@ class Model(QtCore.QAbstractItemModel):
                         max=max_,
                     )
                 ]
+        self.dataChanged.emit(
+            self.index(0, self.columnCount() - 1), self.index(len(self.layers) - 1, self.columnCount() - 1)
+        )
 
     def on_layer_visibility_changed(self, node):
         layer_id = node.layerId()
