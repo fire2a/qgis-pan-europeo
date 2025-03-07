@@ -36,10 +36,9 @@ from re import sub
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
 from processing.algs.gdal.GdalUtils import GdalUtils
-from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParameterDefinition,
-                       QgsProcessingParameterEnum, QgsProcessingParameterExtent, QgsProcessingParameterMultipleLayers,
-                       QgsProcessingParameterNumber, QgsProcessingParameterRasterDestination,
-                       QgsProcessingParameterRasterLayer, QgsProcessingParameterString)
+from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParameterEnum, QgsProcessingParameterExtent,
+                       QgsProcessingParameterMultipleLayers, QgsProcessingParameterNumber,
+                       QgsProcessingParameterRasterDestination, QgsProcessingParameterString)
 from qgis.PyQt.QtCore import QCoreApplication
 
 
@@ -162,7 +161,8 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
         return QCoreApplication.translate("Processing", string)
 
     def commandName(self):
-        return "gdal_calc_norm"
+        # return "python " + str(Path(__file__).parent / "gdal_calc_sum.py")
+        return "gdal_calc_sum.py"
 
     def getConsoleCommands(self, parameters, context, feedback, executing=True):
 
@@ -265,7 +265,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
                 )
             arguments.append("--weights " + " ".join(weights))
 
-        return ["gdal_calc_sum"] + arguments + ["--"] + infiles
+        return ["python", str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"
@@ -273,9 +273,8 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
     def shortHelpString(self):
         import html
 
-        from fire2a.raster import gdal_calc_sum as amodule
+        from .gdal_calc_sum import __doc__ as docstring
 
-        docstring = amodule.__doc__
         docstring = sub(r"<!-- BEGIN_ARGPARSE_DOCSTRING -->", "", docstring)
         docstring = sub(r"<!-- END_ARGPARSE_DOCSTRING -->", "", docstring)
         html_docstring = html.escape(docstring).replace("\n", "<br>")

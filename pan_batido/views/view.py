@@ -26,6 +26,8 @@ from functools import partial
 from math import nan
 
 from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
+from PyQt5.QtCore import QUrl
+from PyQt5.QtGui import QDesktopServices
 from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
 from qgis.gui import QgsDoubleSpinBox  # type: ignore
 from qgis.PyQt import QtWidgets, uic  # type: ignore
@@ -65,8 +67,12 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.tree.setItemDelegateForColumn(4, SliderListDelegate(self))
         # buttons
         self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(lambda: self.on_apply())
-        # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.delete)
+        self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(lambda: self.on_cancel())
+        self.button_box.button(QtWidgets.QDialogButtonBox.Close).clicked.connect(lambda: self.reject())
+        self.button_box.button(QtWidgets.QDialogButtonBox.Help).clicked.connect(lambda: self.on_help())
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(lambda: self.on_ok())
+        self.button_box.button(QtWidgets.QDialogButtonBox.Reset).clicked.connect(lambda: self.on_reset())
+
         # datatype
         for i, text in enumerate(GDALDataTypeNames):
             self.comboBox_rtype.addItem(text, i)
@@ -92,6 +98,16 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
             projwin=self.mExtentGroupBox.outputExtent(),
             outfile=self.fileWidget.filePath(),
         )
+
+    def on_help(self):
+        QDesktopServices.openUrl(QUrl("https://fire2a.github.io/qgis-pan-europeo/"))
+
+    def on_cancel(self):
+        self.model.cancel_tasks()
+
+    def on_reset(self):
+        self.reject()
+        self.model.reset()
 
     def setup_extent_group_box(self):
         """Set up the QgsExtentGroupBox."""

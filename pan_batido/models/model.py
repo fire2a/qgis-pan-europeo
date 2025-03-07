@@ -12,12 +12,12 @@ InteractiveShellEmbed()()
 # layer.dataProvider().bandStatistics(1).maximumValue,
 """
 import json
+from copy import deepcopy
+from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from attrs import define, field
-from cattrs import structure, unstructure
 from osgeo.gdal import GA_ReadOnly, Open  # type: ignore
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
@@ -38,14 +38,24 @@ def breakit():
 
 
 def dict_to_cattr(data: dict, cls: type) -> object:
-    return structure(data, cls)
+    """
+    Manually convert a dictionary to an instance of the given class.
+    """
+    instance = cls()
+    for key, value in data.items():
+        if hasattr(instance, key):
+            setattr(instance, key, value)
+    return instance
 
 
 def cattr_to_dict(instance: object) -> dict:
-    return unstructure(instance)
+    """
+    Manually convert an instance of a class to a dictionary.
+    """
+    return instance.__dict__
 
 
-@define
+@dataclass
 class Layer:
     id: str = ""
     visibility: bool = False
@@ -54,7 +64,7 @@ class Layer:
     weight: float = 1.0
     min: float | None = None
     max: float | None = None
-    util_funcs: list[dict] = field(factory=lambda: UTILITY_FUNCTIONS.copy())
+    util_funcs: list[dict] = field(default_factory=lambda: deepcopy(UTILITY_FUNCTIONS))
     uf_idx: int = 0  # CURRENTLY SELECTED utility function index
 
 
@@ -72,6 +82,21 @@ class Model(QtCore.QAbstractItemModel):
         self.visibilityChanged.connect(self.update_layer_visibility)
         self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed)
         self.tasks = []  # : QgsProcessingAlgRunnerTask
+
+    def reset(self):
+        self.cancel_tasks()
+        self.layers = []
+        self.load_layers()
+
+    def cancel_tasks(self):
+        for task in self.tasks:
+            try:
+                if task.isActive():
+                    task.cancel()
+                    QgsMessageLog.logMessage(f"Task '{task.description()}' canceled", tag=TAG, level=Qgis.Warning)
+            except RuntimeError as e:
+                if str(e).endswith("has been deleted"):
+                    continue
 
     def index(self, row, column, parent=QtCore.QModelIndex()):
         if not self.hasIndex(row, column, parent):
@@ -211,6 +236,9 @@ class Model(QtCore.QAbstractItemModel):
                         max=max_,
                     )
                 ]
+        self.dataChanged.emit(
+            self.index(0, self.columnCount() - 1), self.index(len(self.layers) - 1, self.columnCount() - 1)
+        )
 
     def on_layer_visibility_changed(self, node):
         layer_id = node.layerId()
@@ -264,6 +292,7 @@ class Model(QtCore.QAbstractItemModel):
             return
 
         for raster in self.layers:
+            print(f"{raster.name=}, {raster.filepath=}")
             task = QgsProcessingAlgRunnerTask(
                 algorithm=QgsApplication.processingRegistry().algorithmById("native:zonalstatisticsfb"),
                 parameters={
@@ -397,7 +426,7 @@ class Model(QtCore.QAbstractItemModel):
         for raster in self.layers:
             if not raster.visibility:
                 continue
-            print(f"{raster.name=}")
+            print(f"{raster.name=}, {raster.filepath=}")
             util_func = raster.util_funcs[raster.uf_idx]
             # normalization method
             method = util_func["name"]
