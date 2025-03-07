@@ -264,6 +264,7 @@ class Model(QtCore.QAbstractItemModel):
             return
 
         for raster in self.layers:
+            print(f"{raster.name=}, {raster.filepath=}")
             task = QgsProcessingAlgRunnerTask(
                 algorithm=QgsApplication.processingRegistry().algorithmById("native:zonalstatisticsfb"),
                 parameters={
@@ -397,7 +398,7 @@ class Model(QtCore.QAbstractItemModel):
         for raster in self.layers:
             if not raster.visibility:
                 continue
-            print(f"{raster.name=}")
+            print(f"{raster.name=}, {raster.filepath=}")
             util_func = raster.util_funcs[raster.uf_idx]
             # normalization method
             method = util_func["name"]
