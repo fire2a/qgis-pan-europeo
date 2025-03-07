@@ -12,12 +12,11 @@ InteractiveShellEmbed()()
 # layer.dataProvider().bandStatistics(1).maximumValue,
 """
 import json
+from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from attrs import define, field
-from cattrs import structure, unstructure
 from osgeo.gdal import GA_ReadOnly, Open  # type: ignore
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
@@ -38,14 +37,24 @@ def breakit():
 
 
 def dict_to_cattr(data: dict, cls: type) -> object:
-    return structure(data, cls)
+    """
+    Manually convert a dictionary to an instance of the given class.
+    """
+    instance = cls()
+    for key, value in data.items():
+        if hasattr(instance, key):
+            setattr(instance, key, value)
+    return instance
 
 
 def cattr_to_dict(instance: object) -> dict:
-    return unstructure(instance)
+    """
+    Manually convert an instance of a class to a dictionary.
+    """
+    return instance.__dict__
 
 
-@define
+@dataclass
 class Layer:
     id: str = ""
     visibility: bool = False
@@ -54,7 +63,7 @@ class Layer:
     weight: float = 1.0
     min: float | None = None
     max: float | None = None
-    util_funcs: list[dict] = field(factory=lambda: UTILITY_FUNCTIONS.copy())
+    util_funcs: list[dict] = field(default_factory=lambda: UTILITY_FUNCTIONS.copy())
     uf_idx: int = 0  # CURRENTLY SELECTED utility function index
 
 
