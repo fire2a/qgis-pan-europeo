@@ -28,7 +28,7 @@ from math import nan
 from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
 from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QDesktopServices
-from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
+from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer, QgsCoordinateTransform  # type: ignore
 from qgis.gui import QgsDoubleSpinBox  # type: ignore
 from qgis.PyQt import QtWidgets, uic  # type: ignore
 from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
@@ -126,6 +126,9 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
 
     def on_iface_selection_changed_update_extent_group_box(self, layer):
         if isinstance(layer, QgsVectorLayer) and layer.selectedFeatureCount() > 0:
+            from_crs = layer.crs()
+            to_crs = QgsProject.instance().crs()
+
             if layer.selectedFeatureCount() == 1:
                 extent = layer.selectedFeatures()[0].geometry().boundingBox()
             else:
@@ -141,8 +144,8 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
                     max_y = max(bbox.yMaximum(), max_y)
                 extent = QgsRectangle(min_x, min_y, max_x, max_y)
 
-            crs = QgsProject.instance().crs()
-            self.mExtentGroupBox.setOutputExtentFromUser(extent, crs)
+            extent = QgsCoordinateTransform(from_crs, to_crs, QgsProject.instance()).transformBoundingBox(extent)
+            self.mExtentGroupBox.setOutputExtentFromUser(extent, to_crs)
 
 
 def revalue_combo_box(combo):

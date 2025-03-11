@@ -163,7 +163,7 @@ class Model(QtCore.QAbstractItemModel):
             return True
         if role == Qt.EditRole and column == 3:
             # print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
-            layer = self.layers[index.row()]
+            layer = self.layers[row]
             layer.util_funcs = value["cb"]
             layer.uf_idx = value["idx"]
             self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
@@ -172,7 +172,7 @@ class Model(QtCore.QAbstractItemModel):
         if role == Qt.EditRole and column == 4:
             # print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
             # breakit()()
-            layer = self.layers[index.row()]
+            layer = self.layers[row]
             for slider in value:
                 param_name, _, val, _ = slider
                 layer.util_funcs[layer.uf_idx]["params"][param_name]["value"] = val
