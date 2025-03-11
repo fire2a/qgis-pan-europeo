@@ -15,6 +15,8 @@ hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 
 changelog=
+        0.10.1 Fixed bug on selected polygon bounding box that didn't match project crs, testing plugin_dependencies
+        0.10.0 Backend remade into QT model view framework
         0.0.9 Better logging: summarizes the input instance and gdal callback every 0.5 seconds
         0.0.8 Skip non-rasters or non-local rasters on dialog creation, common transform of extents before intersection
         0.0.7 Invisible rasters load
@@ -29,7 +31,6 @@ changelog=
 tags=python, raster summary, ponderation, multiattribute utility functions
 
 homepage=https://fire2a.github.io/qgis-pan-europeo
-category=Analysis
 icon=resources/icon.png
 # experimental flag
 experimental=False
@@ -40,10 +41,10 @@ deprecated=False
 # Since QGIS 3.8, a comma separated list of plugins to be installed
 # (or upgraded) can be specified.
 # Check the documentation for more information.
-# plugin_dependencies=
+plugin_dependencies=Pan Europeo Processing
 
-Category of the plugin: Raster, Vector, Database or Web
-# category=Raster
+# Category of the plugin: Raster, Vector, Database or Web
+category=Raster
 
 # If the plugin can run on QGIS Server.
 server=False

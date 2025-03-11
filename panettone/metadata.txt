@@ -20,7 +20,6 @@ changelog=
 tags=python, raster summary, ponderation, multiattribute utility functions
 
 homepage=https://fire2a.github.io/qgis-pan-europeo
-category=Analysis
 icon=icon.png
 # experimental flag
 experimental=False
@@ -33,8 +32,8 @@ deprecated=False
 # Check the documentation for more information.
 # plugin_dependencies=
 
-Category of the plugin: Raster, Vector, Database or Web
-# category=Raster
+# Category of the plugin: Raster, Vector, Database or Web
+category=Raster
 
 # If the plugin can run on QGIS Server.
 server=False
