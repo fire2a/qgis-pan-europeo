@@ -22,13 +22,12 @@
  ***************************************************************************/
 """
 import os
-from functools import partial
 from math import nan
 
 from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
 from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QDesktopServices
-from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer, QgsCoordinateTransform  # type: ignore
+from qgis.core import QgsCoordinateTransform, QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
 from qgis.gui import QgsDoubleSpinBox  # type: ignore
 from qgis.PyQt import QtWidgets, uic  # type: ignore
 from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
@@ -90,6 +89,15 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.model.balance_weights()
 
     def on_ok(self):
+        # Commit any pending changes from the editors to the model
+        self.tree.commitData(self.tree)
+
+        # Close all open editors
+        for row in range(self.model.rowCount()):
+            for column in range(self.model.columnCount()):
+                index = self.model.index(row, column)
+                self.tree.closePersistentEditor(index)
+
         self.model.balance_weights()
         self.model.doit(
             load_normalized=self.checkBox_load_normalized.isChecked(),
@@ -314,6 +322,7 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
 
     def commitAndCloseEditor(self):
         editor = self.sender()
+        breakit()()
         if editor is not None:
             self.commitData.emit(editor)
             self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
