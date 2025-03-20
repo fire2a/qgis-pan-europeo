@@ -456,7 +456,7 @@ class Model(QtCore.QAbstractItemModel):
                     "EXTENT_OPT": 0,
                     "INPUT_A": raster.filepath,
                     "MAX": maximum,
-                    "METHOD": method,
+                    "METHOD": raster.uf_idx,
                     "MIN": minimum,
                     "NO_DATA": no_data,
                     "OUTPUT": norm_file,
