@@ -130,7 +130,7 @@ class Model(QtCore.QAbstractItemModel):
             # print(f"Model:data: ({row}, {column}), {layer.name=}")
             return layer.name
         if role == Qt.EditRole and column == 2:
-            # print(f"Model:data: ({row}, {column}), {layer.weight=}")
+            print(f"Model.data: {row}, {column}, {layer.weight=}")
             return layer.weight
         if role == Qt.EditRole and column == 3:
             combo = {"cb": layer.util_funcs, "idx": layer.uf_idx}
@@ -157,12 +157,13 @@ class Model(QtCore.QAbstractItemModel):
                 self.visibilityChanged.emit(lid, value == Qt.Checked)
                 return True
         if role == Qt.EditRole and column == 2:
-            self.layers[index.row()].weight = value
+            print(f"Model.setData {row=}, {column=}, {value=}")
+            self.layers[row].weight = value
             self.dataChanged.emit(index, index)
             # self.save()
             return True
         if role == Qt.EditRole and column == 3:
-            # print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
+            print(f"Model:setData: ({row}, {column}), {value=}, {role=}")
             layer = self.layers[row]
             layer.util_funcs = value["cb"]
             layer.uf_idx = value["idx"]
@@ -216,7 +217,7 @@ class Model(QtCore.QAbstractItemModel):
         # from pprint import pprint
 
         for layer in self.layers:
-            print(layer.name, layer.weight)
+            print(layer.name, layer.util_funcs[layer.uf_idx])
             # for uf in layer.util_funcs:
             #     pprint(uf)
 
@@ -292,7 +293,7 @@ class Model(QtCore.QAbstractItemModel):
             return
 
         for raster in self.layers:
-            print(f"{raster.name=}, {raster.filepath=}")
+            print(f"Model:on_iface_selection_changed: {raster.name=}, {raster.filepath=}")
             task = QgsProcessingAlgRunnerTask(
                 algorithm=QgsApplication.processingRegistry().algorithmById("native:zonalstatisticsfb"),
                 parameters={
@@ -350,7 +351,7 @@ class Model(QtCore.QAbstractItemModel):
         # get min and max values from the output layer
         min_, max_ = float("inf"), float("-inf")
         for feat in output_layer.getFeatures():
-            print(f"{feat['_min']=}, {feat['_max']=}")
+            print(f"Model:on_iface_selection_changed_task_finished: {feat['_min']=}, {feat['_max']=}")
             if feat["_min"] < min_:
                 min_ = feat["_min"]
             if feat["_max"] > max_:
@@ -420,17 +421,19 @@ class Model(QtCore.QAbstractItemModel):
         rtype 7: Float32 : GDALDataTypeNames[7]
         """
         print(f"Model.doit: {load_normalized=}, {no_data=}, {rtype=}")
+        # print(f"{self.layers=}")
+
         self.save()
         norm_files = []
         norm_tasks = []
         for raster in self.layers:
             if not raster.visibility:
                 continue
-            print(f"{raster.name=}, {raster.filepath=}")
+            print(f"Model.doit: {raster.name=}, {raster.filepath=}")
             util_func = raster.util_funcs[raster.uf_idx]
             # normalization method
             method = util_func["name"]
-            print(f"{method=}")
+            print(f"Model.doit: {method=}")
             # don't need minmax
             if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
                 minimum, maximum = None, None
@@ -445,11 +448,16 @@ class Model(QtCore.QAbstractItemModel):
             # params
             func_params = util_func["params"]
             func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
-            print(f"{func_values_str=}")
+            print(f"Model.doit: {func_values_str=}")
             # output file
             norm_file = NamedTemporaryFile(suffix=".tif", delete=False).name
             norm_files += [norm_file]
 
+            for idx, uf in enumerate(UTILITY_FUNCTIONS):
+                if uf["name"] == method:
+                    assert idx == raster.uf_idx
+                    break
+            print(f"Model.doit: {method_idx=}, {method=}")
             task = QgsProcessingAlgRunnerTask(
                 algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
                 parameters={
@@ -528,12 +536,12 @@ class Model(QtCore.QAbstractItemModel):
             if output_layer and output_layer.isValid():
                 QgsProject.instance().addMapLayer(self.context.takeResultLayer(output_layer.id()))
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from context layer.", tag=TAG, level=Qgis.Success)
-                print("from context")
+                print("Model.on_doit_task_finished: from context")
             elif Path(results["OUTPUT"]).is_file():
                 layer = QgsRasterLayer(results["OUTPUT"], force_name)
                 QgsProject.instance().addMapLayer(layer)
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from file.", tag=TAG, level=Qgis.Success)
-                print("from file")
+                print("Model.on_doit_task_finished: from file")
 
 
 def get_file_minmax(filename, force=True):
