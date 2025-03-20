@@ -165,7 +165,7 @@ class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
         value = index.model().data(index, Qt.EditRole)
         editor = DoubleSpinSlider(parent=parent)
         editor.set3(0, value, 100)
-        editor.valueChanged.connect(lambda value, idx=index: self.on_value_changed(value, idx))
+        editor.editingFinished.connect(lambda: self.commitAndCloseEditor)
         return editor
 
     def setEditorData(self, editor, index):
@@ -174,9 +174,11 @@ class WeightDoubleSpinSliderDelegate(QtWidgets.QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         model.setData(index, editor.value(), Qt.EditRole)
 
-    def on_value_changed(self, value, index):
-        model = index.model()
-        model.setData(index, value, Qt.EditRole)
+    def commitAndCloseEditor(self):
+        editor = self.sender()
+        if editor is not None:
+            self.commitData.emit(editor)
+            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
 
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
@@ -220,7 +222,9 @@ class UtilityFuncComboBoxDelegate(QtWidgets.QStyledItemDelegate):
         for item in data["cb"]:
             editor.addItem(item["description"], item)
         editor.setCurrentIndex(data["idx"])
-        editor.currentIndexChanged.connect(partial(self.commitAndCloseEditor, editor))
+        # editor.currentIndexChanged.connect(partial(self.commitAndCloseEditor, editor))
+        # editor.currentIndexChanged.connect(partial(self.on_current_index_changed, editor, index))
+        editor.currentIndexChanged.connect(self.commitAndCloseEditor)
         return editor
 
     def setEditorData(self, editor, index):
@@ -229,13 +233,26 @@ class UtilityFuncComboBoxDelegate(QtWidgets.QStyledItemDelegate):
         editor.setCurrentIndex(editor.findData(value))
 
     def setModelData(self, editor, model, index):
-        # print(f"ComboBoxDelegate:setModelData: {index.row()=}, {index.column()=}")
+        print(f"ComboBoxDelegate:setModelData: {index.row()=}, {index.column()=}")
         value = {"cb": [editor.itemData(i) for i in range(len(editor))], "idx": editor.currentIndex()}
         model.setData(index, value, Qt.EditRole)
 
-    def commitAndCloseEditor(self, editor):
+    def commitAndCloseEditor(self):
+        editor = self.sender()
+        if editor is None:
+            print("ComboBoxDelegate:commitAndCloseEditor: editor is None")
+            return
+        if editor.currentText() == "":
+            print("ComboBoxDelegate:commitAndCloseEditor: editor.currentText() == ''")
+            return
+        print(f"ComboBoxDelegate:commitAndCloseEditor: {editor.currentText()=}")
         self.commitData.emit(editor)
         self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
+
+    # def on_current_index_changed(self, editor, index):
+    #     model = index.model()
+    #     value = {"cb": [editor.itemData(i) for i in range(len(editor))], "idx": editor.currentIndex()}
+    #     model.setData(index, value, Qt.EditRole)
 
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
@@ -273,7 +290,8 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
             slider = DoubleSpinSlider(parent=editor)
             slider.set3(min_, val, max_)
             slider.setText(text)
-            slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
+            # slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
+            slider.editingFinished.connect(lambda: self.commitAndCloseEditor)
             layout.addWidget(slider)
         return editor
 
@@ -293,6 +311,12 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
             max_ = slider.maximum()
             sliders.append((text, min_, val, max_))
         model.setData(index, sliders, Qt.EditRole)
+
+    def commitAndCloseEditor(self):
+        editor = self.sender()
+        if editor is not None:
+            self.commitData.emit(editor)
+            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
 
     def on_value_changed(self, value, index, slidx):
         model = index.model()
@@ -320,7 +344,7 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
                 slider.setRange(min_, max_)
                 slider.setValue(val)
                 slider.setText(text)
-                slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
+                # slider.valueChanged.connect(lambda value, idx=index, sid=slidx: self.on_value_changed(value, idx, sid))
                 layout.addWidget(slider)
 
             tree_top_left = tree.viewport().mapTo(tree, option.rect.topLeft())

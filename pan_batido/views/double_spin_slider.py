@@ -12,6 +12,7 @@ from qgis.PyQt.QtCore import QSize, Qt
 
 class DoubleSpinSlider(QtWidgets.QWidget):
     valueChanged = QtCore.pyqtSignal(float)
+    editingFinished = QtCore.pyqtSignal()
 
     def __init__(self, orientation=QtCore.Qt.Horizontal, decimals=3, parent=None, *args, **kargs):
         super().__init__(parent)
@@ -32,7 +33,9 @@ class DoubleSpinSlider(QtWidgets.QWidget):
         self.setLayout(layout)
 
         self.spinbox.valueChanged.connect(self.on_spinbox_value_changed)
+        self.spinbox.editingFinished.connect(self.on_editing_finished)
         self.slider.valueChanged.connect(self.on_slider_value_changed)
+        self.slider.sliderReleased.connect(self.on_slider_released)
 
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
 
@@ -78,12 +81,23 @@ class DoubleSpinSlider(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(float)
     def on_spinbox_value_changed(self, value):
-        self.spinbox.setValue(value)
+        self.slider.blockSignals(True)
+        self.slider.setValue(int(value * self._multi))
+        self.slider.blockSignals(False)
         self.valueChanged.emit(value)
 
+    @QtCore.pyqtSlot(int)
     def on_slider_value_changed(self, value):
-        self.slider.setValue(int(value * self._multi))
-        self.on_spinbox_value_changed(value / self._multi)
+        self.spinbox.blockSignals(True)
+        self.spinbox.setValue(value / self._multi)
+        self.spinbox.blockSignals(False)
+        self.valueChanged.emit(value / self._multi)
+
+    def on_editing_finished(self):
+        self.editingFinished.emit()
+
+    def on_slider_released(self):
+        self.editingFinished.emit()
 
     def value(self):
         return self.spinbox.value()
