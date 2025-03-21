@@ -114,7 +114,12 @@ def calc(
     b=None,
     r=None,
     **kwargs,
-):
+) -> Dataset:
+    """This is the wrapper function for the gdal_calc.Calc utility.
+
+    Although the normalization functions are symbolic strings defined in the main, passed as the `func` argument. Make sure to check them before using this function directly.
+
+    All extra keyword arguments are passed to the gdal_calc.Calc function."""
     if isinstance(infile, Path):
         infile = str(infile)
     if isinstance(outfile, Path):
@@ -167,13 +172,13 @@ def calc(
 
 
 def arg_parser(argv=None):
-    """Parse command line arguments."""
+    """Parse arguments list"""
     from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
     parser = ArgumentParser(
         description="Raster normalization utility, wrapping on osgeo_utils.gdal_calc with a set of predefined normalization methods. Run `gdal_calc.py --help` for more information.",
         formatter_class=ArgumentDefaultsHelpFormatter,
-        epilog="documentation at https://fire2a.github.io/fire2a-lib/fire2a/gdal_calc_norm.html",
+        epilog="documentation at https://fire2a.github.io/fire2a-lib/fire2a/raster/gdal_calc_norm.html",
     )
     parser.add_argument(
         "params",
@@ -256,9 +261,18 @@ def arg_parser(argv=None):
 
 def main(argv=None):
     """
-    args = arg_parser(["-i","/tmp/fuels.tif", "-m", "stepup"])
-    args = arg_parser(["-i","cbh.tif", "-m", "minmax", "30"])
-    _, info = read_raster(str(args.infile), data=False)
+    <pre><code>
+    minmax: (A-minimum)/(maximum - minimum)
+    maxmin: (A-maximum)/(minimum - maximum)
+    stepup: 0*(A<threshold)+1*(A>=threshold)
+    stepdown: 1*(A<threshold)+0*(A>=threshold)
+    bipiecewiselinear: (A-a)/(b-a) then "0*(A<0)+1*(A>1)"
+    bipiecewiselinear_percent: (A-a*r)/(b*r-a*r) then "0*(A<0)+1*(A>1)"
+    stepup_percent: 0*(A<threshold*r)+1*(A>=threshold*r)
+    stepdown_percent: 1*(A<threshold*r)+0*(A>=threshold*r)
+
+    r : relative delta : data.max() - data.min() / 100
+    </code></pre>
     """
     if argv is sys.argv:
         argv = sys.argv[1:]
