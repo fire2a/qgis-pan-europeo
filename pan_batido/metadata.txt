@@ -6,7 +6,8 @@ description=Ponders very large and distinct rasters with different utility funct
 version=0.0.1
 author=Fernando Badilla Veliz - Fire2a.com
 email=fbadilla@ing.uchile.cl
-about=This plugin calculates a summary raster weighting very large and distinct rasters with different multi utility attribute functions, for the PanEuropeo project by fire2a(.com)
+about=This plugin calculates a summary raster weighting very large and distinct rasters with different multi utility attribute functions, for the PanEuropeo project by fire2a(.com). 
+	0.10.2 Bug fixed on utility function selection not being sent properly to the backend.
 tracker=https://github.com/fire2a/qgis-pan-europeo/issues
 repository=https://github.com/fire2a/qgis-pan-europeo
 # End of mandatory metadata
@@ -15,6 +16,7 @@ hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 
 changelog=
+        0.10.2 Fixed bug on utility function selection not being sent properly to the backend
         0.10.1 Fixed bug on selected polygon bounding box that didn't match project crs, testing plugin_dependencies
         0.10.0 Backend remade into QT model view framework
         0.0.9 Better logging: summarizes the input instance and gdal callback every 0.5 seconds

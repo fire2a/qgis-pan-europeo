@@ -14,6 +14,7 @@ hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 
 changelog=
+	0.10.2 Matching pan_batido version + docstring updates
 	0.0.1 Initial depends on (pip install) fire2a-lib
 
 # Tags are comma separated with spaces allowed
