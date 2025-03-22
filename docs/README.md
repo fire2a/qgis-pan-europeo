@@ -38,18 +38,22 @@ Because the plugin is intended to process ~30 rasters at 100m pixel resolution (
 
 ## How to use
 1. Open QGIS 
-    - optional: setup any CRS in meters like EPSG:3857
-    - optional: open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "Marraqueta" tab
+    - optional: setup any CRS in meters like EPSG:3857, preferably the same SRC as your raster layers.
+    - optional: open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "PanEuropeo" tab.
 2. Load a set of raster layers
-3. [Optional] Select a polygon feature to define the area of study (else the visible area will be used)
-3. Click on the "Pan European Proof of Concept" plugin icon
+3. [Optional] Load a Polygon to represent the area of study.
+4. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
+3. Click on the "Pan European" plugin icon.
 4. Configure for each layer/row (see details [below](#raster-configuration))
-5. Configure target raster creation (only for advanced options mode else the first layer resolution is used)
-6. Buttons: 
+5. Configure target raster creation (only for advanced options mode else the first layer resolution is used).  
+   a. Filename: name and place where you will save the resulting layer (prioritization). If it is empty a temporary file will be generated.  
+   b. NoDataValue: Value to be used for pixels with no data. If it is empty...  
+   c. DataType: Data Type to be used for the resulting layer (prioritization).  
+7. Buttons: 
 ```
-Reset: to clear the dialog, load another set of layers
-Cancel: to close the dialog and do nothing
-Ok: to calculate a new layer
+Reset: to clear the dialog, load another set of layers.
+Cancel: to close the dialog and do nothing.
+Ok: to calculate and get the results (priorization).
 ```
 After clicking "Ok" calculations will begin, if you feel it's taking too long, switch to advanced mode.  
 Then a new, randomly named GTiff raster, will be written into your temporal files.  
@@ -59,8 +63,7 @@ It can be easily export as a pdf, png or other format by right click on the laye
 For each available layer (must be local and written to disk) available configurations are:
 1. Layer enable/disable checkbox
 2. Weight attributes as spinbox & slider (they get adjusted to sum 100 at run time)
-3. [Advanced] Resample method combobox selector (see details [below](#resampling-methods))
-4. Utility function configuration, select between:  
+3. Utility function configuration, select between:  
    a. Min-Max scaling  
    b. Max-Min scaling, same but inverted  
    c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values  
@@ -79,6 +82,7 @@ Also in the case that one of them being zero (or minimun observation) a flat par
 
 You get up-slope and flat. Conversely, if `b=0 and a>0`, the graph will be reflected the vertically (as c. and d.), getting flat and down-slope.  
 Finally by one of them being 1 (or maximun observation) instead of 0, you get the other flat part removed.
+If you choose to use the real values, please note that you may have to wait for Qgis to load the real values in the parameters section.
 
 5. [Advanced] Target raster creation setup:
    - If enabled, by default, creates a HD (1920x1080 pixels) image with each pixel representing an hectare (100x100m) pixel size; this values can be adjusted. With a trade-off on the final raster size and processing time.
