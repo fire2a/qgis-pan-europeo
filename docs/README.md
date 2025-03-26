@@ -9,9 +9,9 @@
 This QGIS plugin allows its users to priorize resources based in several variables with different units (e.g. population density, fuel load, etc.). It works by defining the relative weight of each variable and the utility attribute function and its parameters to standerize all variables. It also allows to define the extent of the analysis.    
 Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units.
 
-| Basic User Interface | Advanced Options Enabled |
-| --- | --- |
-|![basic_user_interface](ui_basic.png)|![advanced_user_interface](ui_advanced.png)|
+| Interface with Advanced Options Enabled |
+| --- |
+|![basic_user_interface](Plugin.jpg)|
 
 ## Quick start
 - Install QGIS (latest desktop version on qgis.org)
