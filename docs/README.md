@@ -6,9 +6,8 @@
   * [Resampling methods](#resampling-methods)
 - [About us](#about-us)
 
-Thiss QGIS plugin allows its users to calculate a summary cualitative raster from a set of large rasters; by defining for each one its relative weight, utility attribute function parameters, and optionally, a resampling method for each input and a target resolution for the output.
-
-Because the plugin is intended to process ~30 rasters at 100m pixel resolution (~30xGiB of data) a default resampling method and target precision configuration is provided; Although the plugin can work with any available raster layers. The target resolution can be skipped and the output resolution is set as the one of the first raster.
+This QGIS plugin allows its users to priorize resources based in several variables with different units (e.g. population density, fuel load, etc.). It works by defining the relative weight of each variable and the utility attribute function and its parameters to standerize all variables. It also allows to define the extent of the analysis.    
+Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units.
 
 | Basic User Interface | Advanced Options Enabled |
 | --- | --- |
