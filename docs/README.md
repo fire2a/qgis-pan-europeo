@@ -17,7 +17,7 @@ Users should define the variables to include, its relative weight, its utility a
 - Install QGIS (latest desktop version on qgis.org)
 - On the QGIS menu, go to Plugins > Manage and Install Plugins
 - Enable experimental Plugins on Settings section     
-- All (vertical tab on the left) > Search for "Pan European Proof of Concept" (top horizontal input) > Select the plugin (checkbox) > Click "Install" (bottom right)
+- All (vertical tab on the left) > Search for "Pan European Proof of Concept (Pan Europeo)" in the top horizontal search bar > Select the plugin (checkbox) > Click "Install" (bottom right)
 - The plugin will be available on the "Plugins" section of the toolbar or on the "Plugins" menu, by clicking on the icon:
   
 <div align="center">
@@ -44,7 +44,7 @@ Users should define the variables to include, its relative weight, its utility a
 4. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
 3. Click on the "Pan European" plugin icon.
 4. Configure for each layer/row (see details [below](#raster-configuration))
-5. Configure target raster creation (only for advanced options mode else the first layer resolution is used).  
+5. Configure target raster creation (only for advanced options mode).  
    a. Filename: name and place where you will save the resulting layer (prioritization). If it is empty a temporary file will be generated.  
    b. NoDataValue: Value to be used for pixels with no data. If it is empty...  
    c. DataType: Data Type to be used for the resulting layer (prioritization).  
@@ -54,7 +54,7 @@ Reset: to clear the dialog, load another set of layers.
 Cancel: to close the dialog and do nothing.
 Ok: to calculate and get the results (priorization).
 ```
-After clicking "Ok" calculations will begin, if you feel it's taking too long, switch to advanced mode.  
+After clicking "Ok" calculations will begin.  
 Then a new, randomly named GTiff raster, will be written into your temporal files.  
 It can be easily export as a pdf, png or other format by right click on the layer > Export > Save as [Image]  
 
