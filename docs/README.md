@@ -87,46 +87,6 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 - The algorithm can get confused if the shown raster is not in a squared meters projection CRS
 - Currently different datatypes than Float-32 is untested
 
-### Resampling methods
-Each target raster is expected to have billion pixels and the resampling method is crucial to the final result in a reasonable time. The following methods are available:
-
-    Nearest Neighbor:
-        This is the default and fastest algorithm.
-        It assigns the value of the closest pixel in the original raster to the corresponding pixel in the output array.
-        This method can introduce sharp edges and blockiness in the resampled image.
-        Probably the most used method for categorical rasters.
-
-    Bilinear:
-        This method considers the four nearest neighboring pixels in the original raster.
-        It calculates a weighted average of their values based on their distance to the new pixel location in the output array.
-        Bilinear interpolation produces smoother results compared to nearest neighbor but may introduce some blurring.
-        Probably the most used method in rasters with continuous data.
-
-    Cubic:
-        This method involves a 4x4 neighborhood of pixels in the original raster.
-        It uses a polynomial function to interpolate a new value for the output pixel based on the values of surrounding pixels.
-        Cubic interpolation provides smoother results than bilinear but is computationally more expensive.
-
-    Cubic Spline:
-        This method uses cubic spline interpolation, which is a more advanced technique compared to regular cubic interpolation.
-        It offers smoother results but is even more computationally intensive.
-
-    Lanczos:
-        This method employs a Lanczos filter for interpolation, known for its good preservation of high-frequency details.
-        It can be computationally expensive but may be preferred for resampling imagery with sharp edges or fine details.
-
-    Average:
-        This method calculates the average value of all neighboring pixels in the original raster and assigns it to the output pixel.
-        It can be useful for smoothing noisy data but may blur sharp features.
-
-    Mode:
-        This method assigns the value that appears most frequently among the neighboring pixels in the original raster to the output pixel.
-        It can be useful for categorical data but may not be suitable for continuous datasets.
-
-    Gauss:
-        This method utilizes a Gaussian distribution to weight the values of neighboring pixels in the original raster.
-        It can be useful for datasets with continuous variation but is less common than other resampling methods.
-
 # About us
 
 | Role | Where | Method |
