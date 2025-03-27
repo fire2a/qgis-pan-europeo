@@ -39,8 +39,8 @@ Users should define the variables to include, its relative weight, its utility a
 1. Open QGIS 
     - optional: setup any CRS in meters like EPSG:3857, preferably the same SRC as your raster layers.
     - optional: open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "PanEuropeo" tab.
-2. Load a set of raster layers
-3. [Optional] Load a Polygon to represent the area of study.
+2. Load a set of raster layers. Layers must be local and written to disk.  
+3. [Optional] Load a Polygon containing the study area.  
 4. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
 3. Click on the "Pan European" plugin icon.
 4. Configure for each layer/row (see details [below](#raster-configuration))
@@ -67,10 +67,10 @@ For each available layer (must be local and written to disk) available configura
    b. Max-Min scaling, same but inverted  
    c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values  
    d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)  
-   e. Step-Up function, with a single breakpoint setup as data real value  
-   f. Step-Up function, with a single breakpoint setup as percentage  
-   g. Step-Down function, with a single breakpoint setup as data real value  
-   h. Step-Down function, with a single breakpoint setup as percentage  
+   e. Step-Up value function, with a single breakpoint setup as data real value  
+   f. Step-Up percentage function, with a single breakpoint setup as percentage  
+   g. Step-Down value function, with a single breakpoint setup as data real value  
+   h. Step-Down percentage function, with a single breakpoint setup as percentage  
 
 <img src="utility_functions.png" alt="utility functions graph" style="width:80%; height:80%;">
 
@@ -80,12 +80,8 @@ Also in the case that one of them being zero (or minimun observation) a flat par
 <img src="utility_function_2pw_azero.png" alt="utility function a=0" style="width:30%; height:30%;">
 
 You get up-slope and flat. Conversely, if `b=0 and a>0`, the graph will be reflected the vertically (as c. and d.), getting flat and down-slope.  
-Finally by one of them being 1 (or maximun observation) instead of 0, you get the other flat part removed.
-If you choose to use the real values, please note that you may have to wait for Qgis to load the real values in the parameters section.
-
-5. [Advanced] Target raster creation setup:
-   - If enabled, by default, creates a HD (1920x1080 pixels) image with each pixel representing an hectare (100x100m) pixel size; this values can be adjusted. With a trade-off on the final raster size and processing time.
-   - When the zoom level is so high that the shown data is smaller than the configured output raster, the configuration is ignored and the target raster will have the same resolution as the raster in the actual viewport
+Finally by one of them being 1 (or maximun observation) instead of 0, you get the other flat part removed.  
+**If you choose to use the real values, please note that you may have to wait for Qgis to load the real values in the parameters section.**
 
 ### Known issues
 - The algorithm can get confused if the shown raster is not in a squared meters projection CRS
