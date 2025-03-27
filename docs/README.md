@@ -36,21 +36,24 @@ Users should define the variables to include, its relative weight, its utility a
 </div>
 
 ## How to use
-1. Open QGIS 
-    - optional: setup any CRS in meters like EPSG:3857, preferably the same SRC as your raster layers.
-    - optional: open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "PanEuropeo" tab.
+1. Setup QGIS Project  
+    a. setup the project CRS to EPSG:3857, the same SRC as your raster layers.  
+    b. [Optional] open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "PanEuropeo" tab.  
 2. Load a set of raster layers. Layers must be local and written to disk.  
-3. [Optional] Load a Polygon containing the study area.  
-4. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
-3. Click on the "Pan European" plugin icon.
-4. Configure for each layer/row (see details [below](#raster-configuration))
-5. Configure target raster creation (only for advanced options mode).  
+3. [Optional] Load a Polygon containing the study area.
+4. Save the project.  
+5. Click on the "Pan European" plugin icon.
+6. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
+7. Configure for each layer/row (see details [below](#raster-configuration))
+8. [Optional] Configure target raster creation (only for advanced options mode).  
    a. Filename: name and place where you will save the resulting layer (prioritization). If it is empty a temporary file will be generated.  
-   b. NoDataValue: Value to be used for pixels with no data. If it is empty...  
+   b. NoDataValue: Value to be used for pixels with no data.  
    c. DataType: Data Type to be used for the resulting layer (prioritization).  
-7. Buttons: 
+9. Buttons: 
 ```
+Help: Open this user manual.
 Reset: to clear the dialog, load another set of layers.
+Apply: redistributes the weights values so that they add up to 100
 Cancel: to close the dialog and do nothing.
 Ok: to calculate and get the results (priorization).
 ```
