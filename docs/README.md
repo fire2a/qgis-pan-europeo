@@ -10,7 +10,7 @@ Users should define the variables to include, its relative weight, its utility a
 
 | Basic User Interface | Interface with Advanced Options Enabled |
 | --- | --- |
-|![basic_user_interface](Plugin.jpg)|![basic_user_interface](Plugin.jpg)|
+|![basic_user_interface](PanEuropean_basic_UI.png)|![basic_user_interface](Plugin.jpg)|
 
 ## Quick start
 - Install QGIS (latest desktop version on qgis.org)
