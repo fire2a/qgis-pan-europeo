@@ -7,7 +7,7 @@
 - [About us](#about-us)
 
 This QGIS plugin allows its users to priorize resources based in several variables with different units (e.g. population density, fuel load, etc.). It works by defining the relative weight of each variable and the utility attribute function and its parameters to standerize all variables. It also allows to define the extent of the analysis.    
-Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units.
+Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units. 
 
 | Interface with Advanced Options Enabled |
 | --- |
@@ -66,7 +66,7 @@ For each available layer (must be local and written to disk) available configura
 1. Layer enable/disable checkbox
 2. Weight attributes as spinbox & slider (they get adjusted to sum 100 at run time)
 3. Utility function configuration, select between:  
-   a. Min-Max scaling  
+   a. Min-Max scaling.  
    b. Max-Min scaling, same but inverted  
    c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values  
    d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)  
