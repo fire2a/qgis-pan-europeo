@@ -3,21 +3,20 @@
 - [Quick start](#quick-start)
 - [How to use](#how-to-use) 
   * [Raster configuration](#raster-configuration)
-  * [Resampling methods](#resampling-methods)
 - [About us](#about-us)
 
 This QGIS plugin allows its users to priorize resources based in several variables with different units (e.g. population density, fuel load, etc.). It works by defining the relative weight of each variable and the utility attribute function and its parameters to standerize all variables. It also allows to define the extent of the analysis.    
 Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units. 
 
-| Interface with Advanced Options Enabled |
-| --- |
-|![basic_user_interface](Plugin.jpg)|
+| Basic User Interface | Interface with Advanced Options Enabled |
+| --- | --- |
+|![basic_user_interface](Plugin.jpg)|![basic_user_interface](Plugin.jpg)|
 
 ## Quick start
 - Install QGIS (latest desktop version on qgis.org)
 - On the QGIS menu, go to Plugins > Manage and Install Plugins
 - Enable experimental Plugins on Settings section     
-- All (vertical tab on the left) > Search for "Pan European Proof of Concept (Pan Europeo)" in the top horizontal search bar > Select the plugin (checkbox) > Click "Install" (bottom right)
+- All (vertical tab on the left) > Search for "Pan Europeo" in the top horizontal search bar > Select the plugin (checkbox) > Click "Install" (bottom right). Also install "Pan Europeo Processing" plugin repeating the last two steps.
 - The plugin will be available on the "Plugins" section of the toolbar or on the "Plugins" menu, by clicking on the icon:
   
 <div align="center">
