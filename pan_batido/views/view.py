@@ -25,10 +25,13 @@ import os
 from functools import partial
 from math import nan
 
+import numpy as np
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
 from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QDesktopServices
-from qgis.core import QgsProject, QgsRectangle, QgsVectorLayer, QgsCoordinateTransform  # type: ignore
+from qgis.core import QgsCoordinateTransform, QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
 from qgis.gui import QgsDoubleSpinBox  # type: ignore
 from qgis.PyQt import QtWidgets, uic  # type: ignore
 from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
@@ -85,6 +88,22 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.setup_extent_group_box()
         self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)
         self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed_update_extent_group_box)
+
+        self.init_graphics_view()
+
+    def init_graphics_view(self):
+        """Initialize the QGraphicsView with a matplotlib plot."""
+        # Create a matplotlib figure and canvas
+        fig = Figure(figsize=(12, 3))
+        canvas = FigureCanvas(fig)
+        utility_functions(fig)
+
+        # Embed the canvas into the QGraphicsView
+        scene = QtWidgets.QGraphicsScene(self)
+        proxy_widget = QtWidgets.QGraphicsProxyWidget()
+        proxy_widget.setWidget(canvas)
+        scene.addItem(proxy_widget)
+        self.graphicsView.setScene(scene)
 
     def on_apply(self):
         self.model.balance_weights()
@@ -336,6 +355,43 @@ class SliderListDelegate(QtWidgets.QStyledItemDelegate):
             del editor
         else:
             super().paint(painter, option, index)
+
+
+def utility_functions(fig):
+    # fig, ax = plt.subplots(1, 3)
+    fig.suptitle("Utility Functions")
+    fig.supxlabel("observations")
+    fig.supylabel("utility")
+    fig.set_layout_engine("constrained")
+    ax = [fig.add_subplot(131), fig.add_subplot(132), fig.add_subplot(133)]
+
+    # min-max & max-min
+    x = np.linspace(0, 1, 100)
+    y1 = x
+    y2 = 1 - x
+    ax[0].plot(x, y1, label="min-max")
+    ax[0].plot(x, y2, label="max-min")
+    ax[0].legend(["min-max", "max-min"])
+    ax[0].set_xticks([0, 1])
+    ax[0].set_xticklabels(["min", "max"])
+
+    # step up
+    y3 = np.piecewise(x, [x < 0.25, x >= 0.25], [0, 1])
+    y4 = np.piecewise(x, [x >= 0.75, x < 0.75], [0, 1])
+    ax[1].plot(x, y3, label="step up")
+    ax[1].plot(x, y4, label="step down")
+    ax[1].legend(["step up", "step down"])
+    ax[1].set_xticks([0, 0.25, 0.75, 1])
+    ax[1].set_xticklabels(["", "threshold", "threshold", ""])
+
+    # bi-piecewise-linear values
+    y5 = np.piecewise(x, [x < 0.25, (x >= 0.25) & (x < 0.75), x >= 0.75], [0, lambda x: (x - 0.25) / 0.5, 1])
+    y6 = np.piecewise(x, [x < 0.25, (x >= 0.25) & (x < 0.75), x >= 0.75], [1, lambda x: (-x + 0.75) / 0.5, 0])
+    ax[2].plot(x, y5, label="bi-piecewise-linear a<b")
+    ax[2].plot(x, y6, label="bi-piecewise-linear a>b")
+    ax[2].legend(["bi-piecewise-linear a<b", "bi-piecewise-linear a>b"])
+    ax[2].set_xticks([0, 0.25, 0.75, 1])
+    ax[2].set_xticklabels(["", "a", "b", ""])
 
 
 if __name__ == "__main__":
