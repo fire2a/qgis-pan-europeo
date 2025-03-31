@@ -86,7 +86,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
             QgsProcessingParameterString(
                 self.PARAMS,
                 self.tr(
-                    "(Optional space separated) normalization <b>params</b>, such as a, b or threshold for bipiecewiselinear or stepup/down"
+                    "(Optional space separated) normalization <b>params</b>, such as a(=0), b(=1) or threshold for bipiecewiselinear or stepup/down"
                 ),
                 defaultValue=None,
                 optional=True,
