@@ -10,7 +10,7 @@ Users should define the variables to include, its relative weight, its utility a
 
 | Basic User Interface | Interface with Advanced Options Enabled |
 | --- | --- |
-|![basic_user_interface](PanEuropean_basic_UI.png)|![basic_user_interface](Plugin.jpg)|
+|![basic_user_interface](PanEuropean_basic_UI_withgraphics.png)|![advanced_user_interface](PanEuropean_AdvancedOptionsEnabled.png)|
 
 ## Quick start
 - Install QGIS (latest desktop version on qgis.org)
@@ -36,13 +36,13 @@ Users should define the variables to include, its relative weight, its utility a
 
 ## How to use
 1. Setup QGIS Project  
-    a. setup the project CRS to EPSG:3857, the same SRC as your raster layers.  
+    a. setup the project CRS to EPSG:3857. Your raster layers should be in the same SRC.
     b. [Optional] open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "PanEuropeo" tab.  
 2. Load a set of raster layers. Layers must be local and written to disk.  
 3. [Optional] Load a Polygon containing the study area.
 4. Save the project.  
 5. Click on the "Pan European" plugin icon.
-6. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
+6. [Optional] Select a polygon feature to define the area of study (else the visible area will be used). Click the “Apply” button to recalculate the parameter range values (raster layers) of the new study area.   
 7. Configure for each layer/row (see details [below](#raster-configuration))
 8. [Optional] Configure target raster creation (only for advanced options mode).  
    a. Filename: name and place where you will save the resulting layer (prioritization). If it is empty a temporary file will be generated.  
