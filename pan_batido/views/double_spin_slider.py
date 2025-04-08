@@ -82,8 +82,11 @@ class DoubleSpinSlider(QtWidgets.QWidget):
         self.valueChanged.emit(value)
 
     def on_slider_value_changed(self, value):
-        self.slider.setValue(int(value * self._multi))
-        self.on_spinbox_value_changed(value / self._multi)
+        try:
+            self.slider.setValue(int(value * self._multi))
+            self.on_spinbox_value_changed(value / self._multi)
+        except OverflowError:
+            print(f"Exception OverflowError on: {value}")
 
     def value(self):
         return self.spinbox.value()

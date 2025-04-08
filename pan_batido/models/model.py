@@ -16,9 +16,11 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
+from re import sub
 from tempfile import NamedTemporaryFile
 
-from osgeo.gdal import GA_ReadOnly, Open  # type: ignore
+from osgeo.gdal import GA_ReadOnly  # type: ignore
+from osgeo.gdal import GA_Update, Open
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
 from qgis.core import QgsMessageLog  # type: ignore
@@ -423,10 +425,12 @@ class Model(QtCore.QAbstractItemModel):
         self.save()
         norm_files = []
         norm_tasks = []
+        norm_names = []
         for raster in self.layers:
             if not raster.visibility:
                 continue
             print(f"{raster.name=}, {raster.filepath=}")
+            norm_names += [clean_str(raster.name)]
             util_func = raster.util_funcs[raster.uf_idx]
             # normalization method
             method = util_func["name"]
@@ -471,18 +475,26 @@ class Model(QtCore.QAbstractItemModel):
             raster_short_name = raster.name[:6] + "..." if len(raster.name) > 6 else raster.name
             description = f"Normalize {raster_short_name} {method} {func_values_str}"
             task.setDescription(description)
+            metadata = {
+                "DESCRIPTION": clean_str(raster.name) + " " + clean_str(method) + " " + clean_str(func_values_str),
+                "AUTHOR": "PanEuropeo",
+            }
             task.executed.connect(
                 partial(
                     self.on_doit_task_finished,
                     force_name="norm_" + raster.name,
                     add2map=load_normalized,
                     description=description,
+                    metadata=metadata,
                 )
             )
             norm_tasks += [task]
             # report
             QgsMessageLog.logMessage(f'Adding task "{description}". Weight:{raster.weight}%', tag=TAG, level=Qgis.Info)
 
+        weights = [r.weight / 100 for r in self.layers if r.visibility]
+        weights_str = " ".join(map(str, weights))
+        dot_prod_str = " + ".join([f"{w:0.5f} x {n}" for w, n in zip(weights, norm_names)])
         final_task = QgsProcessingAlgRunnerTask(
             algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:weightedsummator"),
             parameters={
@@ -492,7 +504,7 @@ class Model(QtCore.QAbstractItemModel):
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
                 "PROJWIN": None,
                 "RTYPE": 7,
-                "WEIGHTS": " ".join(map(str, [r.weight / 100 for r in self.layers if r.visibility])),
+                "WEIGHTS": weights_str,
             },
             context=self.context,
         )
@@ -503,6 +515,7 @@ class Model(QtCore.QAbstractItemModel):
                 force_name="WEIGHTED_SUM" if outfile == "" else Path(outfile).stem,
                 add2map=True,
                 description=description,
+                metadata={"DESCRIPTION": f"Summary: {dot_prod_str}", "AUTHOR": "PanEuropeo"},
             )
         )
         for task in norm_tasks:
@@ -514,7 +527,9 @@ class Model(QtCore.QAbstractItemModel):
         QgsMessageLog.logMessage(f'Starting parent Task "{description}"', tag=TAG, level=Qgis.Info)
         print(f"Model.doit: {self.tasks=}")
 
-    def on_doit_task_finished(self, successful, results, force_name="Result", add2map=lambda: True, description=""):
+    def on_doit_task_finished(
+        self, successful, results, force_name="Result", add2map=lambda: True, description="", metadata={}
+    ):
         pre_msg = f'Task "{description}"'
         if not successful:
             QgsMessageLog.logMessage(f"{pre_msg} finished unsuccessfully", tag=TAG, level=Qgis.Warning)
@@ -526,11 +541,18 @@ class Model(QtCore.QAbstractItemModel):
         # QgsMessageLog.logMessage(f"Task finished successfully {results}", tag=TAG, level=Qgis.Info)
         if add2map:
             if output_layer and output_layer.isValid():
-                QgsProject.instance().addMapLayer(self.context.takeResultLayer(output_layer.id()))
+                layer = self.context.takeResultLayer(output_layer.id())
+                filename = layer.publicSource()
+                if metadata:
+                    add_metadata(filename, metadata)
+                QgsProject.instance().addMapLayer(layer)
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from context layer.", tag=TAG, level=Qgis.Success)
                 print("from context")
             elif Path(results["OUTPUT"]).is_file():
-                layer = QgsRasterLayer(results["OUTPUT"], force_name)
+                filename = results["OUTPUT"]
+                if metadata:
+                    add_metadata(filename, metadata)
+                layer = QgsRasterLayer(filename, force_name)
                 QgsProject.instance().addMapLayer(layer)
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from file.", tag=TAG, level=Qgis.Success)
                 print("from file")
@@ -550,3 +572,24 @@ def get_file_minmax(filename, force=True):
     if not rmin or not rmax or force:
         (rmin, rmax) = raster_band.ComputeRasterMinMax(True)
     return rmin, rmax
+
+
+def clean_str(astring: str):
+    """Replace all non word characters with _, Word characters include letters (a-z, A-Z), digits (0-9), and underscores (_)."""
+    # from string import printable
+    # from re import sub
+    # print(printable, sub(r"\W+", "_", printable))
+    return sub(r"\W+", "_", astring)
+
+
+def add_metadata(filename, metadata):
+    """Add metadata to the raster file."""
+    # filename = "ws.tif"
+    # metadata = {"HOLA": "mundo", "QUE": "tal", "DESCRIPTION":"Esto es una prueba"}
+    dataset = Open(filename, GA_Update)
+    if dataset is None:
+        raise FileNotFoundError(filename)
+    for key, value in metadata.items():
+        dataset.SetMetadataItem(key, value)
+    dataset.FlushCache()
+    dataset = None

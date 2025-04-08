@@ -11,13 +11,13 @@ UTILITY_FUNCTIONS = [
         "name": "bipiecewiselinear_percent",
         "description": "bi-piecewise-linear percentages",
         "numvars": 2,
-        "params": {"a": {"min": 0, "max": 100, "value": 10}, "b": {"min": 0, "max": 100, "value": 50}},
+        "params": {"a=0": {"min": 0, "max": 100, "value": 10}, "b=1": {"min": 0, "max": 100, "value": 50}},
     },
     {
         "name": "bipiecewiselinear",
         "description": "bi-piecewise-linear values",
         "numvars": 2,
-        "params": {"a": {"min": 0, "max": 100, "value": 50}, "b": {"min": 0, "max": 100, "value": 50}},
+        "params": {"a=0": {"min": 0, "max": 100, "value": 50}, "b=1": {"min": 0, "max": 100, "value": 50}},
     },
     {
         "name": "stepup",
