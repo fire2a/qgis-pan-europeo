@@ -66,4 +66,3 @@ jobs:
         tag: ${{ env.RELEASE_TAG }}
         allowUpdates: true
         replacesArtifacts: true
-        removeArtifacts: true
