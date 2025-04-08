@@ -1,6 +1,6 @@
 [general]
 name=Pan Europeo Processing
-qgisMinimumVersion=3.34
+qgisMinimumVersion=3.36.2
 description=gdal calc wrapper for multi utility attribute functions raster calculator
 version=0.0.1
 author=Fernando Badilla Veliz - Fire2a.com
