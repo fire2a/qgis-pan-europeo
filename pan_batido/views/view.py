@@ -136,12 +136,26 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.mExtentGroupBox.setOriginalExtent(extent, crs)
         self.mExtentGroupBox.setCurrentExtent(extent, crs)
         self.mExtentGroupBox.setOutputCrs(crs)
+        self.mExtentGroupBox.extentChanged.connect(self.on_extent_groupbox_changed)
+
+    def on_extent_groupbox_changed(self, extent):
+        """Handle the extentChanged signal from the QgsExtentGroupBox."""
+        print(f"View:on_extent_groupbox_changed {extent=}")
+        self.model.update_minmax(extent)
+        # # Update the map canvas extent
+        # self.iface.mapCanvas().setExtent(extent)
+        # # Update the model with the new extent
+        # self.model.set_extent(extent)
+        # self.iface.mapCanvas().refresh()
+        # self.iface.mapCanvas().update()
+        # self.iface.mapCanvas().refreshAllLayers()
 
     def handle_extent_change(self):
         """Handle the extentsChanged signal from the map canvas."""
         extent = self.iface.mapCanvas().extent()
         crs = QgsProject.instance().crs()
         self.mExtentGroupBox.setCurrentExtent(extent, crs)
+        print("View:handle_extent_change")
 
     def on_iface_selection_changed_update_extent_group_box(self, layer):
         if isinstance(layer, QgsVectorLayer) and layer.selectedFeatureCount() > 0:
@@ -165,6 +179,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
 
             extent = QgsCoordinateTransform(from_crs, to_crs, QgsProject.instance()).transformBoundingBox(extent)
             self.mExtentGroupBox.setOutputExtentFromUser(extent, to_crs)
+            print("View:on_iface_selection_changed_update_extent_group_box")
 
 
 def revalue_combo_box(combo):
