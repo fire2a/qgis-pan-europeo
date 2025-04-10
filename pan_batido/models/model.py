@@ -557,6 +557,12 @@ class Model(QtCore.QAbstractItemModel):
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from file.", tag=TAG, level=Qgis.Success)
                 print("from file")
 
+    def calc_extent_minmax(self, extent):
+        print("Model.calc_extent_minmax")
+        for raster in self.layers:
+            min_value, max_value = get_minmax_with_gdal_calc(raster.filepath, extent)
+            print(f"{raster.name=}, {min_value=}, {max_value=}")
+
 
 def get_file_minmax(filename, force=True):
     # try:
@@ -593,3 +599,40 @@ def add_metadata(filename, metadata):
         dataset.SetMetadataItem(key, value)
     dataset.FlushCache()
     dataset = None
+
+
+def get_minmax_with_gdal_calc(filename, extent=None):
+    """
+    Get the minimum and maximum values of a raster using gdal_calc.
+
+    :param filename: Path to the raster file.
+    :param extent: QgsRectangle object defining the extent to calculate min/max.
+    :return: Tuple of (min_value, max_value) within the extent.
+    """
+    from osgeo_utils.gdal_calc import Calc
+
+    # minx maxy maxx miny
+    rextent = [extent.xMinimum(), extent.yMaximum(), extent.xMaximum(), extent.yMinimum()]
+
+    outfile = NamedTemporaryFile(prefix="pan_europeo_minmax_extent_", suffix=".tif", delete=False).name
+
+    Calc(
+        calc=["numpy.min(A)", "numpy.max(A)"],
+        A=filename,
+        outfile=outfile,
+        projwin=rextent,
+        overwrite=True,
+        # quiet=True,
+    )
+
+    dataset = Open(outfile)
+    if dataset is None:
+        raise FileNotFoundError(f"Raster file not found: {outfile}")
+    band_min = dataset.GetRasterBand(1)
+    band_max = dataset.GetRasterBand(2)
+    array_min = band_min.ReadAsArray()
+    array_max = band_max.ReadAsArray()
+    min_value = array_min[0, 0]
+    max_value = array_max[0, 0]
+
+    return min_value, max_value
