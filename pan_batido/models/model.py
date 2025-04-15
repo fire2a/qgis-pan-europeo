@@ -558,19 +558,8 @@ class Model(QtCore.QAbstractItemModel):
                 print("from file")
 
     def calc_extent_minmax(self, extent):
-        print("Model.calc_extent_minmax")
-        QgsMessageLog.logMessage("Model.calc_extent_minmax", TAG, Qgis.Info)
-
-        def simple_task(task):
-            QgsMessageLog.logMessage("Simple task running", TAG, Qgis.Info)
-            return "Task completed"
-
-        def on_simple_task_finished(result):
-            QgsMessageLog.logMessage(f"Simple task finished: {result}", TAG, Qgis.Info)
-
-        task = QgsTask.fromFunction("Simple Task", simple_task, on_finished=on_simple_task_finished)
-        QgsApplication.taskManager().addTask(task)
-
+        # print("Model.calc_extent_minmax")
+        # QgsMessageLog.logMessage("Model.calc_extent_minmax", TAG, Qgis.Info)
         for raster in self.layers:
             task = QgsTask.fromFunction(
                 "calc extent minmax task" + raster.name,
@@ -582,14 +571,15 @@ class Model(QtCore.QAbstractItemModel):
             )
             self.tasks += [task]
             QgsApplication.taskManager().addTask(task)
-            print(f"Model.calc_extent_minmax: task {raster.name=}, {task=}")
+            # print(f"Model.calc_extent_minmax: task {raster.name=}, {task=}")
+        QgsMessageLog.logMessage("Sent tasks calc min max from extent", TAG, Qgis.Info)
 
 
-def set_minmax_on_fin(e, results):
-    min_, max_, raster, self = results
-    QgsMessageLog.logMessage(
-        "Model.calc_extent_minmax.set_minmax_on_fin:0, {min_=}, {max_=}, {raster=}", TAG, Qgis.Info
-    )
+def set_minmax_on_fin(e, results, min_, max_, raster, self):
+    # min_, max_, raster, self = results
+    # QgsMessageLog.logMessage(
+    #     f"Model.calc_extent_minmax.set_minmax_on_fin:0, {min_=}, {max_=}, {raster.name=}", TAG, Qgis.Info
+    # )
     any_change = False
     for util_func in raster.util_funcs:
         if "percent" in util_func["name"]:
@@ -610,14 +600,16 @@ def set_minmax_on_fin(e, results):
     if any_change:
         index = self.index(self.layers.index(raster), 4)
         self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
-    QgsMessageLog.logMessage("Model.calc_extent_minmax.set_minmax_on_fin:1", TAG, Qgis.Info)
+    # QgsMessageLog.logMessage("Model.calc_extent_minmax.set_minmax_on_fin:1", TAG, Qgis.Info)
 
 
 def get_minmax_task(task, raster, extent, reself):
     QgsMessageLog.logMessage(
-        f"Model.calc_extent_minmax.get_minmax_task:0 {raster.name=}, {str(extent)=}", TAG, Qgis.Info
+        # f"Model.calc_extent_minmax.get_minmax_task:0 {raster.name=}, {str(extent)=}", TAG, Qgis.Info
+        f"Task {task.description()} start!",
+        TAG,
+        Qgis.Info,
     )
-    QgsMessageLog.logMessage("\t ", TAG, Qgis.Info)
     try:
         min_, max_ = get_minmax_with_gdal_open(raster.filepath, extent)
         # print("got minmax in memory")
@@ -625,7 +617,8 @@ def get_minmax_task(task, raster, extent, reself):
         min_, max_ = get_minmax_with_gdal_calc(raster.filepath, extent)
         # print("got minmax through disk")
     # print(f"{raster.name=}, {min_=}, {max_=}")
-    QgsMessageLog.logMessage(f"Model.calc_extent_minmax.get_minmax_task:1 {min_=}, {max_=}", TAG, Qgis.Info)
+    # QgsMessageLog.logMessage(f"Model.calc_extent_minmax.get_minmax_task:1 {min_=}, {max_=}", TAG, Qgis.Info)
+    QgsMessageLog.logMessage(f"Task {task.description()} got {min_=}, {max_=}", TAG, Qgis.Info)
     return min_, max_, raster, reself
 
 
