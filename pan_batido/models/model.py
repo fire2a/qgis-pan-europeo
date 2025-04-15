@@ -559,9 +559,74 @@ class Model(QtCore.QAbstractItemModel):
 
     def calc_extent_minmax(self, extent):
         print("Model.calc_extent_minmax")
+        QgsMessageLog.logMessage("Model.calc_extent_minmax", TAG, Qgis.Info)
+
+        def simple_task(task):
+            QgsMessageLog.logMessage("Simple task running", TAG, Qgis.Info)
+            return "Task completed"
+
+        def on_simple_task_finished(result):
+            QgsMessageLog.logMessage(f"Simple task finished: {result}", TAG, Qgis.Info)
+
+        task = QgsTask.fromFunction("Simple Task", simple_task, on_finished=on_simple_task_finished)
+        QgsApplication.taskManager().addTask(task)
+
         for raster in self.layers:
-            min_value, max_value = get_minmax_with_gdal_calc(raster.filepath, extent)
-            print(f"{raster.name=}, {min_value=}, {max_value=}")
+            task = QgsTask.fromFunction(
+                "calc extent minmax task" + raster.name,
+                get_minmax_task,
+                raster=raster,
+                extent=extent,
+                reself=self,
+                on_finished=set_minmax_on_fin,
+            )
+            self.tasks += [task]
+            QgsApplication.taskManager().addTask(task)
+            print(f"Model.calc_extent_minmax: task {raster.name=}, {task=}")
+
+
+def set_minmax_on_fin(e, results):
+    min_, max_, raster, self = results
+    QgsMessageLog.logMessage(
+        "Model.calc_extent_minmax.set_minmax_on_fin:0, {min_=}, {max_=}, {raster=}", TAG, Qgis.Info
+    )
+    any_change = False
+    for util_func in raster.util_funcs:
+        if "percent" in util_func["name"]:
+            continue
+        for name, params in util_func["params"].items():
+            if "min" in params:
+                # params["min"] = min_
+                uf_id = raster.util_funcs.index(util_func)
+                raster.util_funcs[uf_id]["params"][name]["min"] = min_
+                print(f"changed min {uf_id=} {name=} {min_=}")
+                any_change = True
+            if "max" in params:
+                # params["max"] = max_
+                uf_id = raster.util_funcs.index(util_func)
+                raster.util_funcs[uf_id]["params"][name]["max"] = max_
+                print(f"changed max {uf_id=} {name=} {max_=}")
+                any_change = True
+    if any_change:
+        index = self.index(self.layers.index(raster), 4)
+        self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+    QgsMessageLog.logMessage("Model.calc_extent_minmax.set_minmax_on_fin:1", TAG, Qgis.Info)
+
+
+def get_minmax_task(task, raster, extent, reself):
+    QgsMessageLog.logMessage(
+        f"Model.calc_extent_minmax.get_minmax_task:0 {raster.name=}, {str(extent)=}", TAG, Qgis.Info
+    )
+    QgsMessageLog.logMessage("\t ", TAG, Qgis.Info)
+    try:
+        min_, max_ = get_minmax_with_gdal_open(raster.filepath, extent)
+        # print("got minmax in memory")
+    except RuntimeError:
+        min_, max_ = get_minmax_with_gdal_calc(raster.filepath, extent)
+        # print("got minmax through disk")
+    # print(f"{raster.name=}, {min_=}, {max_=}")
+    QgsMessageLog.logMessage(f"Model.calc_extent_minmax.get_minmax_task:1 {min_=}, {max_=}", TAG, Qgis.Info)
+    return min_, max_, raster, reself
 
 
 def get_file_minmax(filename, force=True):
@@ -604,6 +669,7 @@ def add_metadata(filename, metadata):
 def get_minmax_with_gdal_calc(filename, extent=None):
     """
     Get the minimum and maximum values of a raster using gdal_calc.
+    This works reading large rasters in chunks, so it is not memory intensive.
 
     :param filename: Path to the raster file.
     :param extent: QgsRectangle object defining the extent to calculate min/max.
@@ -634,5 +700,53 @@ def get_minmax_with_gdal_calc(filename, extent=None):
     array_max = band_max.ReadAsArray()
     min_value = array_min[0, 0]
     max_value = array_max[0, 0]
+
+    return min_value, max_value
+
+
+def get_minmax_with_gdal_open(filename, extent):
+    """
+    Get the minimum and maximum values of a raster using GDAL and NumPy.
+    This reads the raster in memory so it is not memory efficient for large rasters, use with try/catch.
+
+    :param filename: Path to the raster file.
+    :param extent: QgsRectangle object defining the extent to calculate min/max.
+    :return: Tuple of (min_value, max_value) within the extent.
+    """
+    from numpy import max as np_max
+    from numpy import min as np_min
+
+    # Open the raster file
+    dataset = Open(filename, GA_ReadOnly)
+    if dataset is None:
+        raise FileNotFoundError(f"Raster file not found: {filename}")
+
+    raster_xsize = dataset.RasterXSize
+    raster_ysize = dataset.RasterYSize
+    # Get the geotransform and raster band
+    geotransform = dataset.GetGeoTransform()
+    x_origin = geotransform[0]
+    y_origin = geotransform[3]
+    x_px_size = geotransform[1]
+    y_px_size = geotransform[5]
+    band = dataset.GetRasterBand(1)
+
+    # Calculate pixel coordinates for the extent
+    x_off = int((extent.xMinimum() - x_origin) / x_px_size)
+    win_xsize = int((extent.xMaximum() - extent.xMinimum()) / x_px_size)
+    y_off = int((extent.yMaximum() - y_origin) / y_px_size)
+    win_ysize = int((extent.yMinimum() - extent.yMaximum()) / y_px_size)
+
+    adjusted_win_xsize = min(win_xsize, raster_xsize - x_off)
+    adjusted_win_ysize = min(win_ysize, raster_ysize - y_off)
+
+    # Read the data within the extent as a NumPy array
+    array = band.ReadAsArray(x_off, y_off, adjusted_win_xsize, adjusted_win_ysize)
+    if array is None:
+        raise ValueError("Failed to read raster data within the specified extent.")
+
+    # Calculate the minimum and maximum values
+    min_value = np_min(array)
+    max_value = np_max(array)
 
     return min_value, max_value
