@@ -19,8 +19,12 @@ from pathlib import Path
 from re import sub
 from tempfile import NamedTemporaryFile
 
+from numpy import isnan
+from numpy import max as np_max
+from numpy import min as np_min
 from osgeo.gdal import GA_ReadOnly  # type: ignore
-from osgeo.gdal import GA_Update, Open
+from osgeo.gdal import ApplyGeoTransform, GA_Update, InvGeoTransform, Open
+from osgeo_utils.gdal_calc import Calc
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
 from qgis.core import QgsMessageLog  # type: ignore
@@ -298,7 +302,7 @@ class Model(QtCore.QAbstractItemModel):
             return
 
         for raster in self.layers:
-            print(f"{raster.name=}, {raster.filepath=}")
+            # print(f"{raster.name=}, {raster.filepath=}")
             task = QgsProcessingAlgRunnerTask(
                 algorithm=QgsApplication.processingRegistry().algorithmById("native:zonalstatisticsfb"),
                 parameters={
@@ -356,7 +360,7 @@ class Model(QtCore.QAbstractItemModel):
         # get min and max values from the output layer
         min_, max_ = float("inf"), float("-inf")
         for feat in output_layer.getFeatures():
-            print(f"{feat['_min']=}, {feat['_max']=}")
+            # print(f"{feat['_min']=}, {feat['_max']=}")
             if feat["_min"] < min_:
                 min_ = feat["_min"]
             if feat["_max"] > max_:
@@ -386,7 +390,7 @@ class Model(QtCore.QAbstractItemModel):
             # print(f"View:on_iface_selection_changed_task_finished:342 {pre_msg=}")
             # breakit()()
             index = self.index(self.layers.index(raster), 4)
-            self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+            self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
             # top_left_index = self.index(self.layers.index(raster), 3)
             # bottom_right_index = self.index(self.layers.index(raster), 4)
             # self.dataChanged.emit(top_left_index, bottom_right_index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
@@ -448,7 +452,7 @@ class Model(QtCore.QAbstractItemModel):
                     first = list(params.values())[0]
                     minimum, maximum = first["min"], first["max"]
                 else:
-                    print("no params!?")
+                    # print("no params!?")
                     minimum, maximum = None, None
             # params
             func_params = util_func["params"]
@@ -529,7 +533,7 @@ class Model(QtCore.QAbstractItemModel):
         self.tasks += [final_task] + norm_tasks
         QgsApplication.taskManager().addTask(final_task)
         QgsMessageLog.logMessage(f'Starting parent Task "{description}"', tag=TAG, level=Qgis.Info)
-        print(f"Model.doit: {self.tasks=}")
+        # print(f"Model.doit: {self.tasks=}")
 
     def on_doit_task_finished(
         self, successful, results, force_name="Result", add2map=lambda: True, description="", metadata={}
@@ -551,7 +555,7 @@ class Model(QtCore.QAbstractItemModel):
                     add_metadata(filename, metadata)
                 QgsProject.instance().addMapLayer(layer)
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from context layer.", tag=TAG, level=Qgis.Success)
-                print("from context")
+                # print("from context")
             elif Path(results["OUTPUT"]).is_file():
                 filename = results["OUTPUT"]
                 if metadata:
@@ -559,11 +563,11 @@ class Model(QtCore.QAbstractItemModel):
                 layer = QgsRasterLayer(filename, force_name)
                 QgsProject.instance().addMapLayer(layer)
                 QgsMessageLog.logMessage(f"{pre_msg} added raster from file.", tag=TAG, level=Qgis.Success)
-                print("from file")
+                # print("from file")
 
     def calc_extent_minmax(self, extent):
-        # print("Model.calc_extent_minmax")
-        # QgsMessageLog.logMessage("Model.calc_extent_minmax", TAG, Qgis.Info)
+        # QgsMessageLog.logMessage("Model.calc_extent_minmax 0", TAG, Qgis.Info)
+        # print("Model.calc_extent_minmax 0")
         for raster in self.layers:
             if extent.contains(raster.extent):
                 self.restore_minmax()
@@ -573,64 +577,91 @@ class Model(QtCore.QAbstractItemModel):
                 QgsMessageLog.logMessage("No intersection between the extents.", TAG, Qgis.Warning)
                 continue
             task = QgsTask.fromFunction(
-                "calc extent minmax task" + raster.name,
+                "Get min & max from extent of raster " + raster.name,
                 get_minmax_task,
                 raster=raster,
                 extent=extent,
-                reself=self,
-                on_finished=set_minmax_on_fin,
+                on_finished=partial(self.set_minmax_on_fin, raster),
             )
             self.tasks += [task]
             QgsApplication.taskManager().addTask(task)
             # print(f"Model.calc_extent_minmax: task {raster.name=}, {task=}")
-        QgsMessageLog.logMessage("Sent tasks calc min max from extent", TAG, Qgis.Info)
+            QgsMessageLog.logMessage(f"Task sent: {task.description()}", TAG, Qgis.Info)
+        # print("Model.calc_extent_minmax 1")
+
+    def set_minmax_on_fin(self, raster, _, min_, max_):
+        # print("Model.set_minmax_on_fin 0 {raster.name=}")
+        if not min_ and not max_:
+            return
+        any_change = False
+        for util_func in raster.util_funcs:
+            if "percent" in util_func["name"]:
+                continue
+            for name, params in util_func["params"].items():
+                if "min" in params:
+                    # params["min"] = min_
+                    uf_id = raster.util_funcs.index(util_func)
+                    if min_:
+                        raster.util_funcs[uf_id]["params"][name]["min"] = min_
+                        # print(f"changed min {uf_id=} {name=} {min_=}")
+                        any_change = True
+                if "max" in params:
+                    # params["max"] = max_
+                    uf_id = raster.util_funcs.index(util_func)
+                    if max_:
+                        raster.util_funcs[uf_id]["params"][name]["max"] = max_
+                        # print(f"changed max {uf_id=} {name=} {max_=}")
+                        any_change = True
+        if any_change:
+            index = self.index(self.layers.index(raster), 4)
+            self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+        # print("Model.set_minmax_on_fin 1 {raster.name=}")
+
+    def restore_minmax(self):
+        # print("Model:restore_minmax 0")
+        for raster in self.layers:
+            any_change = False
+            for util_func in raster.util_funcs:
+                if "percent" in util_func["name"]:
+                    continue
+                for name, params in util_func["params"].items():
+                    if "min" in params:
+                        # params["min"] = min_
+                        uf_id = raster.util_funcs.index(util_func)
+                        raster.util_funcs[uf_id]["params"][name]["min"] = raster.min
+                        any_change = True
+                    if "max" in params:
+                        # params["max"] = max_
+                        uf_id = raster.util_funcs.index(util_func)
+                        raster.util_funcs[uf_id]["params"][name]["max"] = raster.max
+                        any_change = True
+            if any_change:
+                index = self.index(self.layers.index(raster), 4)
+                self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
+                self.layoutChanged.emit()
+        # print("Model:restore_minmax 1")
 
 
-def set_minmax_on_fin(e, results, min_, max_, raster, self):
-    # min_, max_, raster, self = results
-    # QgsMessageLog.logMessage(
-    #     f"Model.calc_extent_minmax.set_minmax_on_fin:0, {min_=}, {max_=}, {raster.name=}", TAG, Qgis.Info
-    # )
-    any_change = False
-    for util_func in raster.util_funcs:
-        if "percent" in util_func["name"]:
-            continue
-        for name, params in util_func["params"].items():
-            if "min" in params:
-                # params["min"] = min_
-                uf_id = raster.util_funcs.index(util_func)
-                raster.util_funcs[uf_id]["params"][name]["min"] = min_
-                print(f"changed min {uf_id=} {name=} {min_=}")
-                any_change = True
-            if "max" in params:
-                # params["max"] = max_
-                uf_id = raster.util_funcs.index(util_func)
-                raster.util_funcs[uf_id]["params"][name]["max"] = max_
-                print(f"changed max {uf_id=} {name=} {max_=}")
-                any_change = True
-    if any_change:
-        index = self.index(self.layers.index(raster), 4)
-        self.dataChanged.emit(index, index, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
-    # QgsMessageLog.logMessage("Model.calc_extent_minmax.set_minmax_on_fin:1", TAG, Qgis.Info)
-
-
-def get_minmax_task(task, raster, extent, reself):
-    QgsMessageLog.logMessage(
-        # f"Model.calc_extent_minmax.get_minmax_task:0 {raster.name=}, {str(extent)=}", TAG, Qgis.Info
-        f"Task {task.description()} start!",
-        TAG,
-        Qgis.Info,
-    )
+def get_minmax_task(task, raster, extent):
+    # f"Model.calc_extent_minmax.get_minmax_task:0 {raster.name=}, {str(extent)=}", TAG, Qgis.Info
+    QgsMessageLog.logMessage(f"Task {task.description()} start!", TAG, Qgis.Info)
     try:
-        min_, max_ = get_minmax_with_gdal_open(raster.filepath, extent)
-        # print("got minmax in memory")
+        min_, max_ = get_minmax_with_gdal_open(raster, extent)
     except RuntimeError:
-        min_, max_ = get_minmax_with_gdal_calc(raster.filepath, extent)
-        # print("got minmax through disk")
-    # print(f"{raster.name=}, {min_=}, {max_=}")
-    # QgsMessageLog.logMessage(f"Model.calc_extent_minmax.get_minmax_task:1 {min_=}, {max_=}", TAG, Qgis.Info)
+        QgsMessageLog.logMessage(
+            "Task {task.description()} failed, raster doesn't fit in memory! Trying gdal_calc...", TAG, Qgis.Warning
+        )
+        try:
+            min_, max_ = get_minmax_with_gdal_calc(raster.filepath, extent)
+        except RuntimeError:
+            QgsMessageLog.logMessage(
+                "Task {task.description()} gdal_cal failed! Try selecting a polygon feature instead..." + raster.name,
+                TAG,
+                Qgis.Warning,
+            )
+            return None, None
     QgsMessageLog.logMessage(f"Task {task.description()} got {min_=}, {max_=}", TAG, Qgis.Info)
-    return min_, max_, raster, reself
+    return min_, max_
 
 
 def get_file_info(filename, force=True):
@@ -688,7 +719,6 @@ def get_minmax_with_gdal_calc(filename, extent=None):
     :param extent: QgsRectangle object defining the extent to calculate min/max.
     :return: Tuple of (min_value, max_value) within the extent.
     """
-    from osgeo_utils.gdal_calc import Calc
 
     # minx maxy maxx miny
     rextent = [extent.xMinimum(), extent.yMaximum(), extent.xMaximum(), extent.yMinimum()]
@@ -717,7 +747,7 @@ def get_minmax_with_gdal_calc(filename, extent=None):
     return min_value, max_value
 
 
-def get_minmax_with_gdal_open(filename, extent):
+def get_minmax_with_gdal_open(raster, extent):
     """
     Get the minimum and maximum values of a raster using GDAL and NumPy.
     This reads the raster in memory so it is not memory efficient for large rasters, use with try/catch.
@@ -726,40 +756,43 @@ def get_minmax_with_gdal_open(filename, extent):
     :param extent: QgsRectangle object defining the extent to calculate min/max.
     :return: Tuple of (min_value, max_value) within the extent.
     """
-    from numpy import max as np_max
-    from numpy import min as np_min
+    # print("get_minmax_with_gdal_open 0")
 
-    # Open the raster file
-    dataset = Open(filename, GA_ReadOnly)
+    dataset = Open(raster.filepath, GA_ReadOnly)
     if dataset is None:
-        raise FileNotFoundError(f"Raster file not found: {filename}")
-
-    raster_xsize = dataset.RasterXSize
-    raster_ysize = dataset.RasterYSize
-    # Get the geotransform and raster band
+        raise FileNotFoundError(f"Raster file not found: {raster.filepath}")
     geotransform = dataset.GetGeoTransform()
-    x_origin = geotransform[0]
-    y_origin = geotransform[3]
-    x_px_size = geotransform[1]
-    y_px_size = geotransform[5]
     band = dataset.GetRasterBand(1)
+    nodata = band.GetNoDataValue()
+    x_size = dataset.RasterXSize
+    y_size = dataset.RasterYSize
 
-    # Calculate pixel coordinates for the extent
-    x_off = int((extent.xMinimum() - x_origin) / x_px_size)
-    win_xsize = int((extent.xMaximum() - extent.xMinimum()) / x_px_size)
-    y_off = int((extent.yMaximum() - y_origin) / y_px_size)
-    win_ysize = int((extent.yMinimum() - extent.yMaximum()) / y_px_size)
+    intersection = extent.intersect(raster.extent)
+    inv_geotransform = InvGeoTransform(geotransform)
+    if not inv_geotransform:
+        raise RuntimeError("Failed to invert geotransform.")
+    x_min, y_min = ApplyGeoTransform(inv_geotransform, intersection.xMinimum(), intersection.yMaximum())
+    x_max, y_max = ApplyGeoTransform(inv_geotransform, intersection.xMaximum(), intersection.yMinimum())
 
-    adjusted_win_xsize = min(win_xsize, raster_xsize - x_off)
-    adjusted_win_ysize = min(win_ysize, raster_ysize - y_off)
+    x_off = int(x_min)
+    y_off = int(y_min)
+    win_xsize = int(x_max - x_min)
+    win_ysize = int(y_max - y_min)
 
-    # Read the data within the extent as a NumPy array
+    # avoid reading outside raster bounds
+    # TODO can't read outside as it's intersecting first?
+    adjusted_win_xsize = min(win_xsize, x_size - x_off)
+    adjusted_win_ysize = min(win_ysize, y_size - y_off)
+
+    # Read the data within the intersection as a NumPy array
     array = band.ReadAsArray(x_off, y_off, adjusted_win_xsize, adjusted_win_ysize)
     if array is None:
         raise ValueError("Failed to read raster data within the specified extent.")
-
-    # Calculate the minimum and maximum values
-    min_value = np_min(array)
-    max_value = np_max(array)
-
-    return min_value, max_value
+    # filter nodata
+    data = array[(array != nodata) & ~isnan(array)]
+    if data.size > 0:
+        # print("get_minmax_with_gdal_open 1")
+        return np_min(data), np_max(data)
+    else:
+        # print("get_minmax_with_gdal_open 1")
+        return None, None
