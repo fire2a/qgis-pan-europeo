@@ -649,13 +649,13 @@ def get_minmax_task(task, raster, extent):
         min_, max_ = get_minmax_with_gdal_open(raster, extent)
     except RuntimeError:
         QgsMessageLog.logMessage(
-            "Task {task.description()} failed, raster doesn't fit in memory! Trying gdal_calc...", TAG, Qgis.Warning
+            f"Task {task.description()} failed, raster doesn't fit in memory! Trying gdal_calc...", TAG, Qgis.Warning
         )
         try:
             min_, max_ = get_minmax_with_gdal_calc(raster.filepath, extent)
         except RuntimeError:
             QgsMessageLog.logMessage(
-                "Task {task.description()} gdal_cal failed! Try selecting a polygon feature instead..." + raster.name,
+                f"Task {task.description()} gdal_cal failed! Try selecting a polygon feature instead..." + raster.name,
                 TAG,
                 Qgis.Warning,
             )
