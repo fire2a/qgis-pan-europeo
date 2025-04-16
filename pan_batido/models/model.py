@@ -25,7 +25,8 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
 from qgis.core import QgsMessageLog  # type: ignore
 from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsProcessingAlgRunnerTask,
-                       QgsProcessingFeatureSourceDefinition, QgsProject, QgsRasterLayer, QgsTask, QgsVectorLayer)
+                       QgsProcessingFeatureSourceDefinition, QgsProject, QgsRasterLayer, QgsRectangle, QgsTask,
+                       QgsVectorLayer)
 
 from ..constants import TAG, UTILITY_FUNCTIONS
 
@@ -66,6 +67,7 @@ class Layer:
     weight: float = 1.0
     min: float | None = None
     max: float | None = None
+    extent: QgsRectangle | None = None
     util_funcs: list[dict] = field(default_factory=lambda: deepcopy(UTILITY_FUNCTIONS))
     uf_idx: int = 0  # CURRENTLY SELECTED utility function index
 
@@ -225,7 +227,7 @@ class Model(QtCore.QAbstractItemModel):
     def load_layers(self):
         for lid, layer in QgsProject.instance().mapLayers().items():
             if isinstance(layer, QgsRasterLayer) and Path(layer.publicSource()).is_file():
-                min_, max_ = get_file_minmax(layer.publicSource())
+                min_, max_, extent = get_file_info(layer.publicSource())
                 layer_tree_layer = QgsProject.instance().layerTreeRoot().findLayer(lid)
                 layer_tree_layer.visibilityChanged.connect(self.on_layer_visibility_changed)
                 self.layers += [
@@ -236,6 +238,7 @@ class Model(QtCore.QAbstractItemModel):
                         filepath=layer.publicSource(),
                         min=min_,
                         max=max_,
+                        extent=extent,
                     )
                 ]
         self.dataChanged.emit(
@@ -259,7 +262,7 @@ class Model(QtCore.QAbstractItemModel):
     def on_layers_added(self, add_layers):
         for layer in add_layers:
             if isinstance(layer, QgsRasterLayer) and Path(layer.publicSource()).is_file():
-                min_, max_ = get_file_minmax(layer.publicSource())
+                min_, max_, extent = get_file_info(layer.publicSource())
                 self.layers += [
                     Layer(
                         id=layer.id(),
@@ -267,6 +270,7 @@ class Model(QtCore.QAbstractItemModel):
                         name=layer.name(),
                         min=min_,
                         max=max_,
+                        extent=extent,
                     )
                 ]
                 QTimer.singleShot(0, lambda lid=layer.id(): self.connect_layer_visibility_signal(lid))
@@ -561,6 +565,13 @@ class Model(QtCore.QAbstractItemModel):
         # print("Model.calc_extent_minmax")
         # QgsMessageLog.logMessage("Model.calc_extent_minmax", TAG, Qgis.Info)
         for raster in self.layers:
+            if extent.contains(raster.extent):
+                self.restore_minmax()
+                QgsMessageLog.logMessage("Extent contains raster, restoring file min, max", TAG, Qgis.Info)
+                continue
+            if extent.intersect(raster.extent).isEmpty():
+                QgsMessageLog.logMessage("No intersection between the extents.", TAG, Qgis.Warning)
+                continue
             task = QgsTask.fromFunction(
                 "calc extent minmax task" + raster.name,
                 get_minmax_task,
@@ -622,7 +633,7 @@ def get_minmax_task(task, raster, extent, reself):
     return min_, max_, raster, reself
 
 
-def get_file_minmax(filename, force=True):
+def get_file_info(filename, force=True):
     # try:
     dataset = Open(filename, GA_ReadOnly)
     # except RuntimeError as e:
@@ -630,12 +641,21 @@ def get_file_minmax(filename, force=True):
     #         raise FileNotFoundError("not recognized as a supported file format " + filename)
     if dataset is None:
         raise FileNotFoundError(filename)
+    # extent
+    geotransform = dataset.GetGeoTransform()
+    x_size = dataset.RasterXSize
+    y_size = dataset.RasterYSize
+    x_min, y_max = ApplyGeoTransform(geotransform, 0, 0)
+    x_max, y_min = ApplyGeoTransform(geotransform, x_size, y_size)
+    extent = QgsRectangle(x_min, y_min, x_max, y_max)
     raster_band = dataset.GetRasterBand(1)
+    # max min
     rmin = raster_band.GetMinimum()
     rmax = raster_band.GetMaximum()
     if not rmin or not rmax or force:
         (rmin, rmax) = raster_band.ComputeRasterMinMax(True)
-    return rmin, rmax
+    #
+    return rmin, rmax, extent
 
 
 def clean_str(astring: str):
