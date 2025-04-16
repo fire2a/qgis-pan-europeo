@@ -591,7 +591,7 @@ class Model(QtCore.QAbstractItemModel):
 
     def set_minmax_on_fin(self, raster, _, min_, max_):
         # print("Model.set_minmax_on_fin 0 {raster.name=}")
-        if not min_ and not max_:
+        if min_ is None and max_ is None:
             return
         any_change = False
         for util_func in raster.util_funcs:
