@@ -30,12 +30,15 @@ from matplotlib.figure import Figure
 from osgeo_utils.gdal_calc import GDALDataTypeNames  # type: ignore
 from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QDesktopServices
-from qgis.core import QgsCoordinateTransform, QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
-from qgis.gui import QgsDoubleSpinBox  # type: ignore
+from qgis.core import Qgis, QgsCoordinateTransform, QgsProject, QgsRectangle, QgsVectorLayer  # type: ignore
+from qgis.gui import QgsDoubleSpinBox, QgsMessageBar  # type: ignore
 from qgis.PyQt import QtWidgets, uic  # type: ignore
 from qgis.PyQt.QtCore import QSize, Qt  # type: ignore
 
 from .double_spin_slider import DoubleSpinSlider
+
+TITLE = "Pan-Europeo"
+DURATION = 3
 
 
 def breakit():
@@ -57,6 +60,11 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         super().__init__(parent)
 
         self.setupUi(self)
+
+        self.message_bar = QgsMessageBar(self)
+        self.message_bar.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        self.layout().insertWidget(0, self.message_bar)  # Insert at the top
+        # self.layout().addWidget(self.message_bar)  # Append to bottom
 
         self.iface = iface
         self.model = model
@@ -116,12 +124,20 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
             projwin=self.mExtentGroupBox.outputExtent(),
             outfile=self.fileWidget.filePath(),
         )
+        text = "The main calculation task has been sent to the background."
+        level = Qgis.Info  # Options: Qgis.Info, Qgis.Warning, Qgis.Critical
+        self.iface.messageBar().pushMessage(TITLE, text, level, DURATION)
+        self.message_bar.pushMessage(TITLE, text, level, DURATION)
 
     def on_help(self):
         QDesktopServices.openUrl(QUrl("https://fire2a.github.io/qgis-pan-europeo/"))
 
     def on_cancel(self):
         self.model.cancel_tasks()
+        text = "The cancel signal has been sent to all Pan-Europeo tasks."
+        level = Qgis.Warning  # Options: Qgis.Info, Qgis.Warning, Qgis.Critical
+        self.iface.messageBar().pushMessage(TITLE, text, level, DURATION)
+        self.message_bar.pushMessage(TITLE, text, level, DURATION)
 
     def on_reset(self):
         self.reject()
@@ -146,6 +162,10 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.mExtentGroupBox.blockSignals(True)
         self.model.calc_extent_minmax(extent)
         self.mExtentGroupBox.blockSignals(False)
+        text = "The extent change triggered min-max calculations background tasks."
+        level = Qgis.Info  # Options: Qgis.Info, Qgis.Warning, Qgis.Critical
+        self.iface.messageBar().pushMessage(TITLE, text, level, DURATION)
+        self.message_bar.pushMessage(TITLE, text, level, DURATION)
         # print(f"View:on_extent_groupbox_changed 1 {extent=}")
 
     def handle_extent_change(self):

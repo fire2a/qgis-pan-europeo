@@ -34,6 +34,9 @@ from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsProcessingAlg
 
 from ..constants import TAG, UTILITY_FUNCTIONS
 
+TITLE = "Pan-Europeo"
+DURATION = 3
+
 
 def breakit():
     # fmt: off
@@ -301,6 +304,10 @@ class Model(QtCore.QAbstractItemModel):
             QgsMessageLog.logMessage("No features selected", tag=TAG, level=Qgis.Warning)
             return
 
+        text = f"Calculating min/max for {layer.selectedFeatureCount()} selected features of {layer.name()}"
+        level = Qgis.Info
+        self.iface.messageBar().pushMessage(TITLE, text, level, DURATION)
+        # self.view.message_bar.pushMessage(TITLE, text, level, DURATION)
         for raster in self.layers:
             # print(f"{raster.name=}, {raster.filepath=}")
             task = QgsProcessingAlgRunnerTask(
