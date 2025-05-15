@@ -94,23 +94,35 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 
 1. Installation, easy from QGIS plugin manager, don't forget Pan Europeo Processing dependency.
 
+
+https://github.com/user-attachments/assets/32f3d423-bbe0-48de-933f-12fe0cf8f636
+
+
 <video controls loop width="100%">
-  <source src="installation.mp4" type="video/mp4">
+  <source src="" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 
 2. Project preparation, saved project, saved rasters, all written in local disk (not network or cloud) in the same projected CRS.
 
+
+https://github.com/user-attachments/assets/b33831dd-71ed-4655-aac6-f7139d723656
+
+
 <video controls loop width="100%">
-  <source src="preparation.mp4" type="video/mp4">
+  <source src="" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 
 3. Navigation & await, selecting a study area triggers (cancellable) background tasks to update raster ranges.
 Also triggered by manually input the extent group controller or by clicking "Map Canvas Extent" to set the current map view as study area.
 
+
+https://github.com/user-attachments/assets/bd630ed4-8a5c-4580-913d-276a0dadff50
+
+
 <video controls loop width="100%">
-  <source src="select_and_background_tasks.mp4" type="video/mp4">
+  <source src="" type="video/mp4">
   Your browser does not support the video tag.
 </video>
    
