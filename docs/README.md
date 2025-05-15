@@ -87,7 +87,7 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 **If you choose to use the real values, please note that you may have to wait for Qgis to load the real values in the parameters section.**
 
 ### Known issues
-- The algorithm can get confused if the shown raster is not in a squared meters projection CRS
+- Mixing different CRS causes unexpected results
 - Currently different datatypes than Float-32 is untested
 
 # Video tutorials
@@ -95,14 +95,14 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 1. Installation, easy from QGIS plugin manager, don't forget Pan Europeo Processing dependency.
 
 <video controls loop width="100%">
-  <source src="https://github.com/user-attachments/assets/cd46515e-a7f2-48e6-b173-2c636e84c32f">
+  <source src="installation.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 
 2. Project preparation, saved project, saved rasters, all written in local disk (not network or cloud) in the same projected CRS.
 
 <video controls loop width="100%">
-  <source src="https://github.com/user-attachments/assets/49b900a1-0e4b-4ed9-878a-2e4950db9284">
+  <source src="preparation.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 
@@ -110,7 +110,7 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 Also triggered by manually input the extent group controller or by clicking "Map Canvas Extent" to set the current map view as study area.
 
 <video controls loop width="100%">
-  <source src="https://github.com/user-attachments/assets/fac1118a-0f44-49c3-abdf-b5e508ef252e">
+  <source src="select_and_background_tasks.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
    
