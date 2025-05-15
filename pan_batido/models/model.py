@@ -515,7 +515,7 @@ class Model(QtCore.QAbstractItemModel):
             parameters={
                 "EXTENT_OPT": 0,
                 "INPUT": norm_files,
-                "NO_DATA": None,
+                "NO_DATA": no_data,
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
                 "PROJWIN": None,
                 "RTYPE": rtype,
