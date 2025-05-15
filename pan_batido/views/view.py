@@ -212,6 +212,8 @@ def revalue_combo_box(combo):
 
 
 def revalue_double_spin_box(spin):
+    # print(f"{spin.text()=}, {spin.specialValueText()=}", spin.text())
+    # spin.text()='', spin.specialValueText()=''  con input vacio
     if spin.text() == spin.specialValueText():
         return None
     return spin.value()
