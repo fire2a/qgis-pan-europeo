@@ -103,6 +103,12 @@ https://github.com/user-attachments/assets/82d91aa3-535b-4b95-9bc5-a844558dc373
 https://github.com/user-attachments/assets/d4d16bbe-874d-45e2-b394-745aa42ceee2
 
 
+3. Navigation & await, selecting a study area triggers (cancellable) background tasks to update raster ranges.
+Also triggered by manually input the extent group controller or by clicking "Map Canvas Extent" to set the current map view as study area.
+   
+
+https://github.com/user-attachments/assets/7591ccec-8958-432d-bcb1-917b1d876f9c
+
 
 # About us
 
