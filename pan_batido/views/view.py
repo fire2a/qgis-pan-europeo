@@ -130,7 +130,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.message_bar.pushMessage(TITLE, text, level, DURATION)
 
     def on_help(self):
-        QDesktopServices.openUrl(QUrl("https://fire2a.github.io/qgis-pan-europeo/"))
+        QDesktopServices.openUrl(QUrl("https://fire2a.github.io/qgis-pan-europeo/index.html"))
 
     def on_cancel(self):
         self.model.cancel_tasks()
