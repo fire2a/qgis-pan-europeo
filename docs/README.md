@@ -97,10 +97,10 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 https://github.com/user-attachments/assets/82d91aa3-535b-4b95-9bc5-a844558dc373
 
 
-2. Project preparation, saved project, saved rasters, all in same projected CRS
+2. Project preparation, saved project, saved rasters, all written in local disk (not network o cloud) in the same projected CRS
 
 
-https://github.com/user-attachments/assets/1964cc8d-dcf7-49ba-9457-b9ba29ab9745
+https://github.com/user-attachments/assets/d4d16bbe-874d-45e2-b394-745aa42ceee2
 
 
 
