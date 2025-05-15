@@ -91,20 +91,28 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 - Currently different datatypes than Float-32 is untested
 
 # Video tutorials
+
 1. Installation, easy from QGIS plugin manager, don't forget Pan Europeo Processing dependency.
 
+<video controls loop width="100%">
+  <source src="https://github.com/user-attachments/assets/82d91aa3-535b-4b95-9bc5-a844558dc373" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
-https://github.com/user-attachments/assets/82d91aa3-535b-4b95-9bc5-a844558dc373
+2. Project preparation, saved project, saved rasters, all written in local disk (not network or cloud) in the same projected CRS.
 
-
-2. Project preparation, saved project, saved rasters, all written in local disk (not network o cloud) in the same projected CRS
-
-
-https://github.com/user-attachments/assets/d4d16bbe-874d-45e2-b394-745aa42ceee2
-
+<video controls loop width="100%">
+  <source src="https://github.com/user-attachments/assets/d4d16bbe-874d-45e2-b394-745aa42ceee2" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 3. Navigation & await, selecting a study area triggers (cancellable) background tasks to update raster ranges.
 Also triggered by manually input the extent group controller or by clicking "Map Canvas Extent" to set the current map view as study area.
+
+<video controls loop width="100%">
+  <source src="https://github.com/user-attachments/assets/7591ccec-8958-432d-bcb1-917b1d876f9c" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
    
 
 https://github.com/user-attachments/assets/7591ccec-8958-432d-bcb1-917b1d876f9c
@@ -120,4 +128,4 @@ https://github.com/user-attachments/assets/7591ccec-8958-432d-bcb1-917b1d876f9c
 | Developer docs |  https://www.github.com/fire2a | Pull Requests |
 
 Developed by fdobad.82 @ [Signal App](https://signal.org)
-Branding & testing by Felipe De La Barra felipedelabarra@fire2a.com 
+Branding & testing by Felipe De La Barra felipedelabarra@fire2a.com
