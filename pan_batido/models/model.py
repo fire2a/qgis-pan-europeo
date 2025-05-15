@@ -24,7 +24,7 @@ from numpy import max as np_max
 from numpy import min as np_min
 from osgeo.gdal import GA_ReadOnly  # type: ignore
 from osgeo.gdal import ApplyGeoTransform, GA_Update, InvGeoTransform, Open
-from osgeo_utils.gdal_calc import Calc
+from osgeo_utils.gdal_calc import Calc, GDALDataTypeNames
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
 from qgis.core import QgsMessageLog  # type: ignore
@@ -431,7 +431,7 @@ class Model(QtCore.QAbstractItemModel):
         self.layoutChanged.emit()
         # self.save()
 
-    def doit(self, load_normalized=False, no_data=None, rtype=7, projwin=None, outfile=""):
+    def doit(self, load_normalized=False, no_data=None, rtype=GDALDataTypeNames.index("Float32"), projwin=None, outfile=""):
         """
         from osgeo_utils.gdal_calc import GDALDataTypeNames
         rtype 7: Float32 : GDALDataTypeNames[7]
@@ -518,7 +518,7 @@ class Model(QtCore.QAbstractItemModel):
                 "NO_DATA": None,
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
                 "PROJWIN": None,
-                "RTYPE": 7,
+                "RTYPE": rtype,
                 "WEIGHTS": weights_str,
             },
             context=self.context,
