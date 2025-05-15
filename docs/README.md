@@ -3,6 +3,7 @@
 - [Quick start](#quick-start)
 - [How to use](#how-to-use) 
   * [Raster configuration](#raster-configuration)
+- [Video tutorials](#video-tutorials) 
 - [About us](#about-us)
 
 This QGIS plugin allows its users to priorize resources based in several variables with different units (e.g. population density, fuel load, etc.). It works by defining the relative weight of each variable and the utility attribute function and its parameters to standerize all variables. It also allows to define the extent of the analysis.    
@@ -88,6 +89,14 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 ### Known issues
 - The algorithm can get confused if the shown raster is not in a squared meters projection CRS
 - Currently different datatypes than Float-32 is untested
+
+# Video tutorials
+1. Installation, easy from QGIS plugin manager, don't forget Pan Europeo Processing dependency.
+
+
+https://github.com/user-attachments/assets/82d91aa3-535b-4b95-9bc5-a844558dc373
+
+
 
 # About us
 
