@@ -92,7 +92,7 @@ class Model(QtCore.QAbstractItemModel):
         QgsProject.instance().layersAdded.connect(self.on_layers_added)
         self.visibilityChanged.connect(self.update_layer_visibility)
         self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed)
-        self.tasks = []  # : QgsProcessingAlgRunnerTask
+        self.tasks = {}  # : QgsProcessingAlgRunnerTask
 
     def reset(self):
         self.cancel_tasks()
@@ -100,14 +100,18 @@ class Model(QtCore.QAbstractItemModel):
         self.load_layers()
 
     def cancel_tasks(self):
-        for task in self.tasks:
+        # list copies preventing RuntimeError "dictionary changed size during iteration"
+        for task in list(self.tasks.keys()):
             try:
+                # isActive : Returns True if the task is active, ie it is not complete and has not been canceled.
                 if task.isActive():
                     task.cancel()
                     QgsMessageLog.logMessage(f"Task '{task.description()}' canceled", tag=TAG, level=Qgis.Warning)
             except RuntimeError as e:
                 if str(e).endswith("has been deleted"):
+                    del self.tasks[task]
                     continue
+        QgsMessageLog.logMessage(f"Tasks remaining: {len(self.tasks)}", tag=TAG, level=Qgis.Info)
 
     def index(self, row, column, parent=QtCore.QModelIndex()):
         if not self.hasIndex(row, column, parent):
@@ -340,7 +344,7 @@ class Model(QtCore.QAbstractItemModel):
                     raster=raster,
                 )
             )
-            self.tasks += [task]
+            self.tasks[task] = task.status()
             QgsApplication.taskManager().addTask(task)
         # print(f"iface.selectionChanged_end: {self.tasks=}")
 
@@ -439,7 +443,7 @@ class Model(QtCore.QAbstractItemModel):
         print(f"Model.doit: {load_normalized=}, {no_data=}, {rtype=}")
         self.save()
         norm_files = []
-        norm_tasks = []
+        norm_tasks = {}
         norm_names = []
         for raster in self.layers:
             if not raster.visibility:
@@ -503,7 +507,7 @@ class Model(QtCore.QAbstractItemModel):
                     metadata=metadata,
                 )
             )
-            norm_tasks += [task]
+            norm_tasks[task] = task.status()
             # report
             QgsMessageLog.logMessage(f'Adding task "{description}". Weight:{raster.weight}%', tag=TAG, level=Qgis.Info)
 
@@ -537,7 +541,8 @@ class Model(QtCore.QAbstractItemModel):
             # final_task.addDependentTask(task) same ?
             final_task.addSubTask(task, [], QgsTask.SubTaskDependency.ParentDependsOnSubTask)
 
-        self.tasks += [final_task] + norm_tasks
+        self.tasks[final_task] = final_task.status()
+        self.tasks.update(norm_tasks)
         QgsApplication.taskManager().addTask(final_task)
         QgsMessageLog.logMessage(f'Starting parent Task "{description}"', tag=TAG, level=Qgis.Info)
         # print(f"Model.doit: {self.tasks=}")
@@ -590,7 +595,7 @@ class Model(QtCore.QAbstractItemModel):
                 extent=extent,
                 on_finished=partial(self.set_minmax_on_fin, raster),
             )
-            self.tasks += [task]
+            self.tasks[task] = task.status()
             QgsApplication.taskManager().addTask(task)
             # print(f"Model.calc_extent_minmax: task {raster.name=}, {task=}")
             QgsMessageLog.logMessage(f"Task sent: {task.description()}", TAG, Qgis.Info)

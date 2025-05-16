@@ -20,6 +20,15 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+
+TODO ?? QgsProcessingProvider -> GdalAlgorithmProvider ??
+var/lib/dpkg/info/python3-qgis-common.list
+386:/usr/share/qgis/python/plugins/processing/algs/gdal/GdalAlgorithm.py
+387:/usr/share/qgis/python/plugins/processing/algs/gdal/GdalAlgorithmDialog.py
+388:/usr/share/qgis/python/plugins/processing/algs/gdal/GdalAlgorithmProvider.py
+619:/usr/share/qgis/python/plugins/processing/tests/GdalAlgorithmsGeneralTest.py
+620:/usr/share/qgis/python/plugins/processing/tests/GdalAlgorithmsRasterTest.py
+621:/usr/share/qgis/python/plugins/processing/tests/GdalAlgorithmsVectorTest.py
 """
 
 __author__ = "fdobad"
