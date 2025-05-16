@@ -24,7 +24,7 @@ from numpy import max as np_max
 from numpy import min as np_min
 from osgeo.gdal import GA_ReadOnly  # type: ignore
 from osgeo.gdal import ApplyGeoTransform, GA_Update, InvGeoTransform, Open
-from osgeo_utils.gdal_calc import Calc
+from osgeo_utils.gdal_calc import Calc, GDALDataTypeNames
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer, QVariant
 from qgis.core import QgsMessageLog  # type: ignore
@@ -33,6 +33,9 @@ from qgis.core import (Qgis, QgsApplication, QgsFeatureRequest, QgsProcessingAlg
                        QgsVectorLayer)
 
 from ..constants import TAG, UTILITY_FUNCTIONS
+
+TITLE = "Pan-Europeo"
+DURATION = 3
 
 
 def breakit():
@@ -301,6 +304,10 @@ class Model(QtCore.QAbstractItemModel):
             QgsMessageLog.logMessage("No features selected", tag=TAG, level=Qgis.Warning)
             return
 
+        text = f"Calculating min/max for {layer.selectedFeatureCount()} selected features of {layer.name()}"
+        level = Qgis.Info
+        self.iface.messageBar().pushMessage(TITLE, text, level, DURATION)
+        # self.view.message_bar.pushMessage(TITLE, text, level, DURATION)
         for raster in self.layers:
             # print(f"{raster.name=}, {raster.filepath=}")
             task = QgsProcessingAlgRunnerTask(
@@ -424,7 +431,7 @@ class Model(QtCore.QAbstractItemModel):
         self.layoutChanged.emit()
         # self.save()
 
-    def doit(self, load_normalized=False, no_data=None, rtype=7, projwin=None, outfile=""):
+    def doit(self, load_normalized=False, no_data=None, rtype=GDALDataTypeNames.index("Float32"), projwin=None, outfile=""):
         """
         from osgeo_utils.gdal_calc import GDALDataTypeNames
         rtype 7: Float32 : GDALDataTypeNames[7]
@@ -508,10 +515,10 @@ class Model(QtCore.QAbstractItemModel):
             parameters={
                 "EXTENT_OPT": 0,
                 "INPUT": norm_files,
-                "NO_DATA": None,
+                "NO_DATA": no_data,
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
                 "PROJWIN": None,
-                "RTYPE": 7,
+                "RTYPE": rtype,
                 "WEIGHTS": weights_str,
             },
             context=self.context,
