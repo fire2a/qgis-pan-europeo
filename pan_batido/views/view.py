@@ -75,6 +75,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.tree.setItemDelegateForColumn(2, WeightDoubleSpinSliderDelegate(self))
         self.tree.setItemDelegateForColumn(3, UtilityFuncComboBoxDelegate(self))
         self.tree.setItemDelegateForColumn(4, SliderListDelegate(self))
+        self.model.restore_minmax()
         # buttons
         self.button_box.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(lambda: self.on_apply())
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(lambda: self.on_cancel())
