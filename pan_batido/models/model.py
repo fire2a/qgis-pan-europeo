@@ -435,7 +435,9 @@ class Model(QtCore.QAbstractItemModel):
         self.layoutChanged.emit()
         # self.save()
 
-    def doit(self, load_normalized=False, no_data=None, rtype=GDALDataTypeNames.index("Float32"), projwin=None, outfile=""):
+    def doit(
+        self, load_normalized=False, no_data=None, rtype=GDALDataTypeNames.index("Float32"), projwin=None, outfile=""
+    ):
         """
         from osgeo_utils.gdal_calc import GDALDataTypeNames
         rtype 7: Float32 : GDALDataTypeNames[7]
@@ -519,11 +521,11 @@ class Model(QtCore.QAbstractItemModel):
             parameters={
                 "EXTENT_OPT": 0,
                 "INPUT": norm_files,
-                "NO_DATA": no_data,
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
                 "PROJWIN": None,
                 "RTYPE": rtype,
                 "WEIGHTS": weights_str,
+                "HIDE_NO_DATA": True,
             },
             context=self.context,
         )

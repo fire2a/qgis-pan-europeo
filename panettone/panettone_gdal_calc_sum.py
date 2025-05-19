@@ -32,15 +32,17 @@ __revision__ = "$Format:%H$"
 
 from pathlib import Path
 from re import sub
+from shutil import which
 
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
 from processing.algs.gdal.GdalUtils import GdalUtils
-from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParameterEnum, QgsProcessingParameterExtent,
-                       QgsProcessingParameterMultipleLayers, QgsProcessingParameterNumber,
+from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParameterBoolean, QgsProcessingParameterEnum,
+                       QgsProcessingParameterExtent, QgsProcessingParameterMultipleLayers, QgsProcessingParameterNumber,
                        QgsProcessingParameterRasterDestination, QgsProcessingParameterString)
 from qgis.PyQt.QtCore import QCoreApplication
 
+python = "python" if which("python") else "python3"
 
 class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
     INPUT = "INPUT"
@@ -53,6 +55,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
     # OPTIONS = "OPTIONS"
     # EXTRA = "EXTRA"
     RTYPE = "RTYPE"
+    HIDE = "HIDE_NO_DATA"
 
     TYPE = GDALDataTypeNames
 
@@ -93,6 +96,14 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
                 self.tr("Set output <b>NoDataValue</b>"),
                 type=QgsProcessingParameterNumber.Type.Double,
                 defaultValue=None,
+                optional=True,
+            )
+        )
+        self.addParameter(
+            QgsProcessingParameterBoolean(
+                self.HIDE,
+                self.tr("HideNoData: ignores the input NoData directive(s) and uses them 'as is' into the calculation"),
+                defaultValue=True,
                 optional=True,
             )
         )
@@ -171,7 +182,12 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
         if self.NO_DATA in parameters and parameters[self.NO_DATA] is not None:
             noData = self.parameterAsDouble(parameters, self.NO_DATA, context)
         else:
-            noData = None
+            noData = "none"
+
+        if self.HIDE in parameters and parameters[self.HIDE] is not None:
+            hide = self.parameterAsBoolean(parameters, self.HIDE, context)
+        else:
+            hide = False
 
         arguments = [
             "--format",
@@ -190,6 +206,9 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
 
         if noData is not None:
             arguments.append(f"--NoDataValue {noData}")
+
+        if hide:
+            arguments.append("--hideNoData")
 
         # Check GDAL version for projwin and extent options (GDAL 3.3 is required)
         if GdalUtils.version() < 3030000 and self.EXTENT in parameters.keys():
@@ -265,7 +284,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
                 )
             arguments.append("--weights " + " ".join(weights))
 
-        return ["python", str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
+        return [python, str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"

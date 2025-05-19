@@ -22,6 +22,9 @@ Is a processing algorithms plugin, to wrap the wrappers of `gdal_calc.py` script
     fire2a.raster.gdal_calc_norm
     fire2a.raster.gdal_calc_sum
 
-### Requires (TODO remove requirement)
+### include gdal_calc from repo to be used locally
 
-    pip install fire2a-lib
+    cp gdal/swig/python/gdal-utils/osgeo_utils/gdal_calc.py .
+    vimdiff gdal_calc.py /usr/lib/python3/dist-packages/osgeo_utils/gdal_calc.py
+    # avoid progress
+    # add argument 'none'
