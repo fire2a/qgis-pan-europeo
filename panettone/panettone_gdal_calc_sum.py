@@ -32,6 +32,7 @@ __revision__ = "$Format:%H$"
 
 from pathlib import Path
 from re import sub
+from shutil import which
 
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
@@ -41,6 +42,7 @@ from qgis.core import (QgsProcessing, QgsProcessingException, QgsProcessingParam
                        QgsProcessingParameterRasterDestination, QgsProcessingParameterString)
 from qgis.PyQt.QtCore import QCoreApplication
 
+python = "python" if which("python") else "python3"
 
 class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
     INPUT = "INPUT"
@@ -282,7 +284,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
                 )
             arguments.append("--weights " + " ".join(weights))
 
-        return ["python", str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
+        return [python, str(Path(__file__).parent / "gdal_calc_sum.py")] + arguments + ["--"] + infiles
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"
