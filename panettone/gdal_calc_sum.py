@@ -68,7 +68,7 @@ from pathlib import Path
 
 from osgeo.gdal import Dataset
 from osgeo_utils.auxiliary.util import GetOutputDriverFor
-from osgeo_utils.gdal_calc import Calc, GDALDataTypeNames
+from gdal_calc import Calc, GDALDataTypeNames
 
 
 def calc(
