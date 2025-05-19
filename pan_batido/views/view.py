@@ -91,7 +91,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.comboBox_rtype.setCurrentIndex(-1)
         # nodata
         self.doubleSpinBox_no_data.setSpecialValueText("")
-        self.doubleSpinBox_no_data.clear()
+        # self.doubleSpinBox_no_data.clear()
         # extent
         self.setup_extent_group_box()
         self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)

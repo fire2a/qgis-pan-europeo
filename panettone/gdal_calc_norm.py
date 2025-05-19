@@ -39,9 +39,9 @@ options:
                         calculated from the WHOLE input raster). (default:
                         None)
   -n [NODATAVALUE], --NoDataValue [NODATAVALUE]
-                        output nodata value (send null for default datatype
+                        output nodata value (send none for default datatype
                         specific, see `from osgeo_utils.gdal_calc import
-                        DefaultNDVLookup`) (default: -9999)
+                        DefaultNDVLookup`) (default: 0)
   -f FORMAT, --format FORMAT
                         Output format (send null to infer from file, see `from
                         osgeo_utils.auxiliary.util import GetOutputDriverFor`)
@@ -173,7 +173,18 @@ def calc(
 
 def arg_parser(argv=None):
     """Parse arguments list"""
-    from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+    from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
+    from typing import Union
+
+    def float_or_none(NoDataValue: str) -> Union[float, str]:
+        if NoDataValue.lower() == "none":
+            return NoDataValue
+
+        try:
+            return float(NoDataValue)
+        except ValueError:
+            msg = f"wtf Invalid float value for NoDataValue: {NoDataValue}"
+            raise ArgumentTypeError(msg)
 
     parser = ArgumentParser(
         description="Raster normalization utility, wrapping on osgeo_utils.gdal_calc with a set of predefined normalization methods. Run `gdal_calc.py --help` for more information.",
@@ -220,10 +231,11 @@ def arg_parser(argv=None):
     parser.add_argument(
         "-n",
         "--NoDataValue",
-        help="output nodata value (send null for default datatype specific, see `from osgeo_utils.gdal_calc import DefaultNDVLookup`)",
-        type=float,
+        help="Output NoDataValue (Defaults to 0 to be weight summed). To indicate not setting a NoDataValue use --NoDataValue=none (GDAL >= 3.3) 'none' value will indicate not setting a NoDataValue.",
+        type=float_or_none,
+        metavar="value",
         nargs="?",
-        default=-9999,
+        default=0.0,
     )
     parser.add_argument(
         "-f",
