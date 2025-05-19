@@ -314,7 +314,7 @@ def main(argv=None):
         args.outfile = keep
         print(f"{args=}")
 
-        func = lambda: "0*(A<0)+1*(A>1)"
+        func = lambda: "0*(A<0)+1*(A>1)+A*((0<=A)&(A<=1))"
         ds = calc(func, **vars(args))
     elif args.method == "bipiecewiselinear_percent":
         """
@@ -338,7 +338,7 @@ def main(argv=None):
         args.outfile = keep
         print(f"{args=}")
 
-        func = lambda: "0*(A<0)+1*(A>1)"
+        func = lambda: "0*(A<0)+1*(A>1)+A*((0<=A)&(A<=1))"
         ds = calc(func, **vars(args))
     elif args.method == "stepup_percent":
         threshold = args.params[0]
