@@ -524,6 +524,7 @@ class Model(QtCore.QAbstractItemModel):
                 "PROJWIN": None,
                 "RTYPE": rtype,
                 "WEIGHTS": weights_str,
+                "HIDE_NO_DATA": True,
             },
             context=self.context,
         )

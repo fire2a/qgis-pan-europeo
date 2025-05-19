@@ -177,6 +177,12 @@ def arg_parser(argv=None):
         help="Return dataset (for scripting -additional keyword arguments are passed to gdal_calc.Calc) instead of return code",
         action="store_true",
     )
+    parser.add_argument(
+        "-H",
+        "--hideNoDataValue",
+        help="Ignores the input bands NoDataValue. By default, the input bands NoDataValue are not participating in the calculation. By setting this setting - no special treatment will be performed on the input NoDataValue. and they will be participating in the calculation as any other value. The output will not have a set NoDataValue, unless you explicitly specified a specific value by setting --NoDataValue=<value>.",
+        action="store_true",
+    )
     args = parser.parse_args(argv)
     args.projwin = tuple(args.projwin) if args.projwin else None
     if len(args.infiles) > 52:
