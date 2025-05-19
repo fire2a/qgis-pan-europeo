@@ -131,6 +131,17 @@ def calc(
 def arg_parser(argv=None):
     """Parse arguments list"""
     from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+    from typing import Union
+
+    def float_or_none(NoDataValue: str) -> Union[float, str]:
+        if NoDataValue.lower() == "none":
+            return NoDataValue
+
+        try:
+            return float(NoDataValue)
+        except ValueError:
+            msg = f"wtf Invalid float value for NoDataValue: {NoDataValue}"
+            raise ArgumentTypeError(msg)
 
     parser = ArgumentParser(
         description="Raster(s) (weighted) summation utility, wrapping osgeo_utils.gdal_calc for sum(weights*rasters). Run `gdal_calc.py --help` for more information.",
@@ -166,10 +177,11 @@ def arg_parser(argv=None):
     parser.add_argument(
         "-n",
         "--NoDataValue",
-        help="output nodata value (send empty for default datatype specific, see `from osgeo_utils.gdal_calc import DefaultNDVLookup`)",
-        type=float,
+        help="Output NoDataValue (Defaults to 'none' to be weight summed). To indicate not setting a NoDataValue use --NoDataValue=none (GDAL >= 3.3) 'none' value will indicate not setting a NoDataValue.",
+        type=float_or_none,
+        metavar="value",
         nargs="?",
-        default=-9999,
+        default="none",
     )
     parser.add_argument(
         "-r",

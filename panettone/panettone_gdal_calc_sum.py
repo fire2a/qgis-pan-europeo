@@ -182,7 +182,7 @@ class ProcessingGdalCalcSumAlgorithm(GdalAlgorithm):
         if self.NO_DATA in parameters and parameters[self.NO_DATA] is not None:
             noData = self.parameterAsDouble(parameters, self.NO_DATA, context)
         else:
-            noData = None
+            noData = "none"
 
         if self.HIDE in parameters and parameters[self.HIDE] is not None:
             hide = self.parameterAsBoolean(parameters, self.HIDE, context)
