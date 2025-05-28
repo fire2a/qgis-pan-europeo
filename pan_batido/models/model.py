@@ -531,7 +531,7 @@ class Model(QtCore.QAbstractItemModel):
                 "EXTENT_OPT": 0,
                 "INPUT": norm_files,
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
-                "PROJWIN": None,
+                "PROJWIN": projwin if skip_normalization else None,
                 "RTYPE": rtype,
                 "WEIGHTS": weights_str,
                 "HIDE_NO_DATA": True,
