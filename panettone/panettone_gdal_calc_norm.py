@@ -31,6 +31,7 @@ __copyright__ = "(C) 2025 by fdobad"
 __revision__ = "$Format:%H$"
 from pathlib import Path
 from re import sub
+from shutil import which
 
 from osgeo_utils.gdal_calc import GDALDataTypeNames
 from processing.algs.gdal.GdalAlgorithm import GdalAlgorithm
@@ -43,6 +44,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 
 from .constants import METHODS
 
+python = "python" if which("python") else "python3"
 
 class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
     INPUT_A = "INPUT_A"
@@ -289,7 +291,7 @@ class ProcessingGdalCalcNormAlgorithm(GdalAlgorithm):
             arguments.append("--")
             arguments.append(self.parameterAsString(parameters, self.PARAMS, context))
 
-        return ["python", str(Path(__file__).parent / "gdal_calc_norm.py")] + arguments
+        return [python, str(Path(__file__).parent / "gdal_calc_norm.py")] + arguments
 
     def helpUrl(self):
         return "https://gdal.org/programs/gdal_calc.html"

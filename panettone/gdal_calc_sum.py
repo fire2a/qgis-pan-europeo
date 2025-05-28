@@ -68,7 +68,7 @@ from pathlib import Path
 
 from osgeo.gdal import Dataset
 from osgeo_utils.auxiliary.util import GetOutputDriverFor
-from osgeo_utils.gdal_calc import Calc, GDALDataTypeNames
+from gdal_calc import Calc, GDALDataTypeNames
 
 
 def calc(
@@ -131,6 +131,17 @@ def calc(
 def arg_parser(argv=None):
     """Parse arguments list"""
     from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+    from typing import Union
+
+    def float_or_none(NoDataValue: str) -> Union[float, str]:
+        if NoDataValue.lower() == "none":
+            return NoDataValue
+
+        try:
+            return float(NoDataValue)
+        except ValueError:
+            msg = f"wtf Invalid float value for NoDataValue: {NoDataValue}"
+            raise ArgumentTypeError(msg)
 
     parser = ArgumentParser(
         description="Raster(s) (weighted) summation utility, wrapping osgeo_utils.gdal_calc for sum(weights*rasters). Run `gdal_calc.py --help` for more information.",
@@ -166,15 +177,22 @@ def arg_parser(argv=None):
     parser.add_argument(
         "-n",
         "--NoDataValue",
-        help="output nodata value (send empty for default datatype specific, see `from osgeo_utils.gdal_calc import DefaultNDVLookup`)",
-        type=float,
+        help="Output NoDataValue (Defaults to 'none' to be weight summed). To indicate not setting a NoDataValue use --NoDataValue=none (GDAL >= 3.3) 'none' value will indicate not setting a NoDataValue.",
+        type=float_or_none,
+        metavar="value",
         nargs="?",
-        default=-9999,
+        default="none",
     )
     parser.add_argument(
         "-r",
         "--return_dataset",
         help="Return dataset (for scripting -additional keyword arguments are passed to gdal_calc.Calc) instead of return code",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-H",
+        "--hideNoDataValue",
+        help="Ignores the input bands NoDataValue. By default, the input bands NoDataValue are not participating in the calculation. By setting this setting - no special treatment will be performed on the input NoDataValue. and they will be participating in the calculation as any other value. The output will not have a set NoDataValue, unless you explicitly specified a specific value by setting --NoDataValue=<value>.",
         action="store_true",
     )
     args = parser.parse_args(argv)
