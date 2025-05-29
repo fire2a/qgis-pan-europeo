@@ -96,8 +96,20 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.setup_extent_group_box()
         self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)
         self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed_update_extent_group_box)
+        # Disable the load-normalized checkbox when skip normalization is toggled
+        self.checkBox_skip_normalization.toggled.connect(self.on_skip_normalization_toggled)
 
         self.init_graphics_view()
+
+    def on_skip_normalization_toggled(self, checked):
+        """Handle the toggling of the skip normalization checkbox.
+        If checked, disable the load normalized checkbox to prevent loading duplicate or non-existent data.
+        """
+        if checked:
+            self.checkBox_load_normalized.setChecked(False)
+            self.checkBox_load_normalized.setEnabled(False)
+        else:
+            self.checkBox_load_normalized.setEnabled(True)
 
     def init_graphics_view(self):
         """Initialize the QGraphicsView with a matplotlib plot."""
@@ -124,6 +136,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
             rtype=revalue_combo_box(self.comboBox_rtype),
             projwin=self.mExtentGroupBox.outputExtent(),
             outfile=self.fileWidget.filePath(),
+            skip_normalization=self.checkBox_skip_normalization.isChecked(),
         )
         text = "The main calculation task has been sent to the background."
         level = Qgis.Info  # Options: Qgis.Info, Qgis.Warning, Qgis.Critical

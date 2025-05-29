@@ -436,7 +436,13 @@ class Model(QtCore.QAbstractItemModel):
         # self.save()
 
     def doit(
-        self, load_normalized=False, no_data=None, rtype=GDALDataTypeNames.index("Float32"), projwin=None, outfile=""
+        self,
+        load_normalized=False,
+        no_data=None,
+        rtype=GDALDataTypeNames.index("Float32"),
+        projwin=None,
+        outfile="",
+        skip_normalization=False,
     ):
         """
         from osgeo_utils.gdal_calc import GDALDataTypeNames
@@ -444,74 +450,77 @@ class Model(QtCore.QAbstractItemModel):
         """
         print(f"Model.doit: {load_normalized=}, {no_data=}, {rtype=}")
         self.save()
-        norm_files = []
         norm_tasks = {}
-        norm_names = []
-        for raster in self.layers:
-            if not raster.visibility:
-                continue
-            print(f"{raster.name=}, {raster.filepath=}")
-            norm_names += [clean_str(raster.name)]
-            util_func = raster.util_funcs[raster.uf_idx]
-            # normalization method
-            method = util_func["name"]
-            print(f"{method=}")
-            # don't need minmax
-            if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
-                minimum, maximum = None, None
-            else:
-                params = util_func["params"]
-                if len(params) > 0:
-                    first = list(params.values())[0]
-                    minimum, maximum = first["min"], first["max"]
-                else:
-                    # print("no params!?")
+        norm_files = [raster.filepath for raster in self.layers if raster.visibility]
+        norm_names = [clean_str(raster.name) for raster in self.layers if raster.visibility]
+        if not skip_normalization:
+            norm_files = []
+            for raster in self.layers:
+                if not raster.visibility:
+                    continue
+                print(f"{raster.name=}, {raster.filepath=}")
+                util_func = raster.util_funcs[raster.uf_idx]
+                # normalization method
+                method = util_func["name"]
+                print(f"{method=}")
+                # don't need minmax
+                if method in ["minmax", "maxmin", "bipiecewiselinear_percent", "stepup_percent", "stepdown_percent"]:
                     minimum, maximum = None, None
-            # params
-            func_params = util_func["params"]
-            func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
-            print(f"{func_values_str=}")
-            # output file
-            norm_file = NamedTemporaryFile(suffix=".tif", delete=False).name
-            norm_files += [norm_file]
+                else:
+                    params = util_func["params"]
+                    if len(params) > 0:
+                        first = list(params.values())[0]
+                        minimum, maximum = first["min"], first["max"]
+                    else:
+                        # print("no params!?")
+                        minimum, maximum = None, None
+                # params
+                func_params = util_func["params"]
+                func_values_str = " ".join([str(param["value"]) for param in func_params.values()])
+                print(f"{func_values_str=}")
+                # output file
+                norm_file = NamedTemporaryFile(suffix=".tif", delete=False).name
+                norm_files += [norm_file]
 
-            task = QgsProcessingAlgRunnerTask(
-                algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
-                parameters={
-                    "EXTENT_OPT": 0,
-                    "INPUT_A": raster.filepath,
-                    "MAX": maximum,
-                    "METHOD": raster.uf_idx,
-                    "MIN": minimum,
-                    "NO_DATA": no_data,
-                    "OUTPUT": norm_file,
-                    "PARAMS": func_values_str,
-                    "PROJWIN": projwin,
-                    "RTYPE": rtype,
-                },
-                context=self.context,
-            )
-            if func_values_str:
-                func_values_str = f" {func_values_str}"
-            raster_short_name = raster.name[:6] + "..." if len(raster.name) > 6 else raster.name
-            description = f"Normalize {raster_short_name} {method} {func_values_str}"
-            task.setDescription(description)
-            metadata = {
-                "DESCRIPTION": clean_str(raster.name) + " " + clean_str(method) + " " + clean_str(func_values_str),
-                "AUTHOR": "PanEuropeo",
-            }
-            task.executed.connect(
-                partial(
-                    self.on_doit_task_finished,
-                    force_name="norm_" + raster.name,
-                    add2map=load_normalized,
-                    description=description,
-                    metadata=metadata,
+                task = QgsProcessingAlgRunnerTask(
+                    algorithm=QgsApplication.processingRegistry().algorithmById("paneuropeo:normalizator"),
+                    parameters={
+                        "EXTENT_OPT": 0,
+                        "INPUT_A": raster.filepath,
+                        "MAX": maximum,
+                        "METHOD": raster.uf_idx,
+                        "MIN": minimum,
+                        "NO_DATA": no_data,
+                        "OUTPUT": norm_file,
+                        "PARAMS": func_values_str,
+                        "PROJWIN": projwin,
+                        "RTYPE": rtype,
+                    },
+                    context=self.context,
                 )
-            )
-            norm_tasks[task] = task.status()
-            # report
-            QgsMessageLog.logMessage(f'Adding task "{description}". Weight:{raster.weight}%', tag=TAG, level=Qgis.Info)
+                if func_values_str:
+                    func_values_str = f" {func_values_str}"
+                raster_short_name = raster.name[:6] + "..." if len(raster.name) > 6 else raster.name
+                description = f"Normalize {raster_short_name} {method} {func_values_str}"
+                task.setDescription(description)
+                metadata = {
+                    "DESCRIPTION": clean_str(raster.name) + " " + clean_str(method) + " " + clean_str(func_values_str),
+                    "AUTHOR": "PanEuropeo",
+                }
+                task.executed.connect(
+                    partial(
+                        self.on_doit_task_finished,
+                        force_name="norm_" + raster.name,
+                        add2map=load_normalized,
+                        description=description,
+                        metadata=metadata,
+                    )
+                )
+                norm_tasks[task] = task.status()
+                # report
+                QgsMessageLog.logMessage(
+                    f'Adding task "{description}". Weight:{raster.weight}%', tag=TAG, level=Qgis.Info
+                )
 
         weights = [r.weight / 100 for r in self.layers if r.visibility]
         weights_str = " ".join(map(str, weights))
@@ -522,7 +531,7 @@ class Model(QtCore.QAbstractItemModel):
                 "EXTENT_OPT": 0,
                 "INPUT": norm_files,
                 "OUTPUT": "TEMPORARY_OUTPUT" if outfile == "" else outfile,
-                "PROJWIN": None,
+                "PROJWIN": projwin if skip_normalization else None,
                 "RTYPE": rtype,
                 "WEIGHTS": weights_str,
                 "HIDE_NO_DATA": True,
