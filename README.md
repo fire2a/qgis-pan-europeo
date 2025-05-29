@@ -1,6 +1,7 @@
 # Easy Raster Summarization tool for QGIS
 
-## Usage
+## Usage summary
+![full tutorial](https://fire2a.github.io/qgis-pan-europeo/)
 
 1. Prepare rasters: Match all raster CRS and extents (squared or projected please)
 2. Put them on a QGIS project (same CRS)
@@ -16,7 +17,9 @@ Install the plugin from the QGIS plugin repository
 
 - Dialog plugin : ![Pan Batido](https://plugins.qgis.org/plugins/pan_batido/)
 
-- TODO: publish the GdalAlgorithmProcessing plugin acting as backend: ![Panettone](panettone/README.md)
+The installation triggers the installation of the following dependency:
+
+- (GdalAlgorithm)Processing plugin backend : ![Panettone](https://plugins.qgis.org/plugins/panettone/)
 
 ### Development
 Clone, symlink, restart QGIS and enable the plugin
@@ -28,18 +31,22 @@ ln -s /path/to/this/repo/panettone .
 ```
 
 #### TODO:
-- [ ] bug on view update, recalculating min max based on the selected feature
+
 - [ ] Ouput with zonal statistics
-- [ ] packaging
-- [ ] Data server ...
+- [ ] Input with layer groups + weights
+- [ ] Data server publication
 
 #### Changelog
+
+![pan batido](https://github.com/fire2a/qgis-pan-europeo/blob/8e64e52ed9596e79f23c876fe6f5fa199a2fd593/pan_batido/metadata.txt#L18)
+![panettone](https://github.com/fire2a/qgis-pan-europeo/blob/8e64e52ed9596e79f23c876fe6f5fa199a2fd593/panettone/metadata.txt#L16)
+
 1. Target resolution: scrapped!
 2. Resampling method: scrapped!
 3. DataType target selector: ok!
 4. backend changed to gdalcal 
 
-#### References
+#### Random References
 
     nodata = band.GetNoDataValue()
     rasterArray = np.ma.masked_equal(rasterArray, nodata)
