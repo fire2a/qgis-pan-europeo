@@ -124,6 +124,7 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
             rtype=revalue_combo_box(self.comboBox_rtype),
             projwin=self.mExtentGroupBox.outputExtent(),
             outfile=self.fileWidget.filePath(),
+            skip_normalization=self.checkBox_skip_normalization.isChecked(),
         )
         text = "The main calculation task has been sent to the background."
         level = Qgis.Info  # Options: Qgis.Info, Qgis.Warning, Qgis.Critical
