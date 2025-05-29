@@ -96,8 +96,20 @@ class Dialog(QtWidgets.QDialog, FORM_CLASS):  # type: ignore
         self.setup_extent_group_box()
         self.iface.mapCanvas().extentsChanged.connect(self.handle_extent_change)
         self.iface.mapCanvas().selectionChanged.connect(self.on_iface_selection_changed_update_extent_group_box)
+        # checkboxes skip then can't load intermediate
+        self.checkBox_skip_normalization.toggled.connect(self.on_skip_normalization_toggled)
 
         self.init_graphics_view()
+
+    def on_skip_normalization_toggled(self, checked):
+        """Handle the toggling of the skip normalization checkbox.
+        If checked, disable the load normalized checkbox to prevent loading unexisting or same data.
+        """
+        if checked:
+            self.checkBox_load_normalized.setChecked(False)
+            self.checkBox_load_normalized.setEnabled(False)
+        else:
+            self.checkBox_load_normalized.setEnabled(True)
 
     def init_graphics_view(self):
         """Initialize the QGraphicsView with a matplotlib plot."""
