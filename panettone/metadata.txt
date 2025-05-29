@@ -14,6 +14,7 @@ hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 
 changelog=
+	1.0.0 Features summing nodata values as 0, using the hideNoData and NoData params. gdal_calc is statically included instead of linked
 	0.10.2 Matching pan_batido version + docstring updates
 	0.0.1 Initial depends on (pip install) fire2a-lib
 
