@@ -40,6 +40,8 @@ It runs entirely in the background, and by chunks; so users can continue working
     </table>
 </div>
 
+- Check out the ![video tutorials](#video-tutorials) below
+
 ## How to use
 1. Setup a QGIS Project  
     a. Set the project CRS to EPSG:3857. Your raster layers should be in the same CRS.  
@@ -85,11 +87,13 @@ For each available layer (must be local and saved/written to disk), available co
 Notice that for the Bi-Piecewise-Linear functions (c. and d.) crossing the breakpoints will invert the function's slope.  
 Also in the case that one of them being zero (or minimun observation) a flat part is removed, e.g., `a=0 and b>0`:
 
-<img src="utility_function_2pw_azero.png" alt="utility function a=0" style="width:30%; height:30%;">
+<div align="center">
+<img src="utility_function_2pw_azero.png" alt="utility function a=0" style="width:30%; height:30%">
+</div>
 
 You get up-slope and flat. Conversely, if `b=0 and a>0`, the graph will be reflected the vertically (as c. and d.), getting flat and down-slope.  
 Finally by one of them being 1 (or maximun observation) instead of 0, you get the other flat part removed.  
-**If you choose to use the real values, please note that you may have to wait for Qgis to load the real values in the parameters section.**
+**If you choose to use the real values, please note that you may have to wait for QGIS to load the real values in the parameters section.**
 
 ### Known issues
 - NoDataValues are converted to zero and used in the final weighted raster, allowing for much more datapoints than masking them out as the default GDAL calc behavior does, so be careful with your NoData values!
