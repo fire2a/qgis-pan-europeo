@@ -3,21 +3,21 @@
 - [Quick start](#quick-start)
 - [How to use](#how-to-use) 
   * [Raster configuration](#raster-configuration)
-  * [Resampling methods](#resampling-methods)
+- [Video tutorials](#video-tutorials) 
 - [About us](#about-us)
 
 This QGIS plugin allows its users to priorize resources based in several variables with different units (e.g. population density, fuel load, etc.). It works by defining the relative weight of each variable and the utility attribute function and its parameters to standerize all variables. It also allows to define the extent of the analysis.    
-Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units.
+Users should define the variables to include, its relative weight, its utility attribute function and its parameters to standerize their values. In these ways, the user can compare variables with different units. 
 
-| Interface with Advanced Options Enabled |
-| --- |
-|![basic_user_interface](Plugin.jpg)|
+| Basic User Interface | Interface with Advanced Options Enabled |
+| --- | --- |
+|![basic_user_interface](PanEuropean_basic_UI_withgraphics.png)|![advanced_user_interface](PanEuropean_AdvancedOptionsEnabled.png)|
 
 ## Quick start
 - Install QGIS (latest desktop version on qgis.org)
 - On the QGIS menu, go to Plugins > Manage and Install Plugins
 - Enable experimental Plugins on Settings section     
-- All (vertical tab on the left) > Search for "Pan European Proof of Concept (Pan Europeo)" in the top horizontal search bar > Select the plugin (checkbox) > Click "Install" (bottom right)
+- All (vertical tab on the left) > Search for "Pan Europeo" in the top horizontal search bar > Select the plugin (checkbox) > Click "Install" (bottom right). Also install "Pan Europeo Processing" plugin repeating the last two steps.
 - The plugin will be available on the "Plugins" section of the toolbar or on the "Plugins" menu, by clicking on the icon:
   
 <div align="center">
@@ -37,13 +37,13 @@ Users should define the variables to include, its relative weight, its utility a
 
 ## How to use
 1. Setup QGIS Project  
-    a. setup the project CRS to EPSG:3857, the same SRC as your raster layers.  
+    a. setup the project CRS to EPSG:3857. Your raster layers should be in the same SRC.
     b. [Optional] open the log panel (View > Panels > Log Messages) to read the plugin's progress on the "PanEuropeo" tab.  
 2. Load a set of raster layers. Layers must be local and written to disk.  
 3. [Optional] Load a Polygon containing the study area.
 4. Save the project.  
 5. Click on the "Pan European" plugin icon.
-6. [Optional] Select a polygon feature to define the area of study (else the visible area will be used).
+6. [Optional] Select a polygon feature to define the area of study (else the visible area will be used). Click the “Apply” button to recalculate the parameter range values (raster layers) of the new study area.   
 7. Configure for each layer/row (see details [below](#raster-configuration))
 8. [Optional] Configure target raster creation (only for advanced options mode).  
    a. Filename: name and place where you will save the resulting layer (prioritization). If it is empty a temporary file will be generated.  
@@ -66,7 +66,7 @@ For each available layer (must be local and written to disk) available configura
 1. Layer enable/disable checkbox
 2. Weight attributes as spinbox & slider (they get adjusted to sum 100 at run time)
 3. Utility function configuration, select between:  
-   a. Min-Max scaling  
+   a. Min-Max scaling.  
    b. Max-Min scaling, same but inverted  
    c. Bi-Piecewise-Linear Values, with its two breakpoint setup as data real values  
    d. Bi-Piecewise-Linear Percentage, with its two breakpoint setup percentage values from real data range (data.max - data.min)  
@@ -87,8 +87,35 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 **If you choose to use the real values, please note that you may have to wait for Qgis to load the real values in the parameters section.**
 
 ### Known issues
-- The algorithm can get confused if the shown raster is not in a squared meters projection CRS
+- Mixing different CRS causes unexpected results
 - Currently different datatypes than Float-32 is untested
+
+# Video tutorials
+
+### Installation, easy from QGIS plugin manager, don't forget Pan Europeo Processing dependency.
+
+
+<video controls="controls" muted="muted" style="width:100%">
+  <source src="https://github.com/user-attachments/assets/32f3d423-bbe0-48de-933f-12fe0cf8f636" type="video/mp4">
+</video>
+
+
+### Project preparation, saved project, saved rasters, all written in local disk (not network or cloud) in the same projected CRS.
+
+
+<video controls="controls" muted="muted" style="width:100%">
+  <source src="https://github.com/user-attachments/assets/b33831dd-71ed-4655-aac6-f7139d723656" type="video/mp4">
+</video>
+
+
+### Navigation & await, selecting a study area triggers (cancellable) background tasks to update raster ranges.
+Also triggered by manually input the extent group controller or by clicking "Map Canvas Extent" to set the current map view as study area.
+
+
+<video controls="controls" muted="muted" style="width:100%">
+  <source src="https://github.com/user-attachments/assets/bd630ed4-8a5c-4580-913d-276a0dadff50" type="video/mp4">
+</video>
+
 
 # About us
 
@@ -100,4 +127,4 @@ Finally by one of them being 1 (or maximun observation) instead of 0, you get th
 | Developer docs |  https://www.github.com/fire2a | Pull Requests |
 
 Developed by fdobad.82 @ [Signal App](https://signal.org)
-Branding & testing by Felipe De La Barra felipedelabarra@fire2a.com 
+Branding & testing by Felipe De La Barra felipedelabarra@fire2a.com
